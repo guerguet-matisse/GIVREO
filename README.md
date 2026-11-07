@@ -2,7 +2,7 @@
 
 # 🧂 GPS Salage
 
-**Le guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)**
+**Le guidage GPS du circuit de salage (Soissons)**
 
 Voies prioritaires, puis voies secondaires · points numérotés · noms de rues
 
