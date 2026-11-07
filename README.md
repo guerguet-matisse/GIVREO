@@ -2,90 +2,120 @@
 
 # 🧂 GPS Salage
 
-**Guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)**
+**Le guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)**
 
-Voies prioritaires → voies secondaires · points numérotés · noms de rue · hors-ligne
+Voies prioritaires, puis voies secondaires · points numérotés · noms de rues
 
-![PWA](https://img.shields.io/badge/PWA-installable-3ea8ff)
-![Open source](https://img.shields.io/badge/100%25-open%20source-5be39a)
-![Sans build](https://img.shields.io/badge/HTML%20%2B%20JS-sans%20framework-ff5a4d)
+### 👉 [Ouvrir l'application](https://guerguet-matisse.github.io/GPS-salage/) 👈
+
+![Gratuit](https://img.shields.io/badge/gratuit-oui-5be39a)
+![Sans installation](https://img.shields.io/badge/installation-depuis%20le%20navigateur-3ea8ff)
+![Open source](https://img.shields.io/badge/open%20source-oui-ff5a4d)
 
 </div>
 
 ---
 
-## ✨ Fonctionnalités
+## 📱 Installer l'application sur ton téléphone
 
-| | |
+Ouvre ce lien sur ton téléphone : **https://guerguet-matisse.github.io/GPS-salage/**
+
+| Téléphone | Comment faire |
 |---|---|
-| 🔴 **Voies prioritaires** | 26 points, suivis dans l'ordre du plan |
-| 🔵 **Voies secondaires** | 44 points, enchaînés automatiquement après le principal |
-| 📍 **Guidage** | rue du prochain point, distance, flèche de direction |
-| ✅ **Validation auto** | le point suivant s'active à moins de 35 m |
-| 🔊 **Voix** | annonce vocale en français de chaque point |
-| 📴 **Hors-ligne** | l'app et les tuiles de carte déjà vues sont mises en cache |
-| ✏️ **Éditeur** | déplace les points, renomme les rues, exporte en JSON |
+| **Android** (Chrome) | Menu **⋮** en haut à droite → **Installer l'application** |
+| **iPhone** (Safari) | Bouton **Partager** → **Sur l'écran d'accueil** |
 
-## 🧱 Technologies (toutes open source)
+L'icône **GPS Salage** apparaît alors avec tes autres applications.
 
-[Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org) · [OSRM](https://project-osrm.org) · HTML / CSS / JavaScript pur
+> 💡 Ouvre l'application une première fois **avec du réseau** : la carte se met en mémoire et fonctionne ensuite même si la connexion est mauvaise.
 
-## 🚀 Démarrage rapide
+---
 
-### Tester sur ton PC
+## 🧭 Premier lancement : caler le circuit (1 minute)
 
-```bash
-cd gps-salage
-python -m http.server 8000
-```
+Les points du circuit viennent d'un plan papier. Pour qu'ils tombent bien sur les rues, il faut un petit calage à faire **une seule fois** :
 
-Puis ouvre <http://localhost:8000>.
+1. Appuie sur **Caler**.
+2. Touche sur la carte l'endroit de chaque repère demandé :
+   1. le **point n°1** : début du circuit, sur l'avenue de Coucy ;
+   2. le **rond-point des États-Unis** (point n°6) ;
+   3. le **pont sur l'Aisne vers Pasly** (point n°12).
+3. L'application recale tout le circuit et le colle sur les rues. Attends le message de confirmation.
 
-### Installer sur ton téléphone
+Si les tracés restent en pointillés, appuie sur **Routes** (il faut du réseau).
 
-> Le GPS exige du **HTTPS**. GitHub Pages en fournit gratuitement.
+---
 
-1. Crée un dépôt GitHub (par ex. `gps-salage`) et place ces fichiers à la racine.
-2. **Settings → Pages** → branche `main`, dossier `/ (root)`.
-3. Ouvre `https://TON-PSEUDO.github.io/gps-salage/` sur le téléphone.
-4. Installe l'app :
-   - **Android (Chrome)** : menu ⋮ → *Installer l'application*
-   - **iPhone (Safari)** : Partager → *Sur l'écran d'accueil*
-5. Autorise la localisation, et ouvre l'app une fois avec du réseau pour mettre la carte en cache.
+## 🚚 Utiliser le guidage
 
-## 🕹️ Utilisation
+1. Appuie sur **Démarrer** et autorise la localisation.
+2. L'écran du haut indique la **rue**, le **numéro du point**, la **distance** et la **direction** à suivre.
+3. À moins de 35 m du point, l'application passe **automatiquement** au suivant.
+4. Après le dernier point des voies prioritaires, elle enchaîne sur les **voies secondaires**.
 
-| Bouton | Action |
+### Les boutons
+
+| Bouton | À quoi il sert |
 |---|---|
-| **Démarrer** | active / coupe le GPS |
+| **Démarrer / Arrêter** | active ou coupe le GPS |
 | **◀ Précédent · Suivant ▶** | change de point à la main (toucher un numéro sur la carte marche aussi) |
-| **Suivre** | la carte reste centrée sur ta position |
-| **Voix** | active l'annonce vocale |
-| **Caler** | à faire en premier : tu touches sur la carte 3 repères (début du circuit, rond-point des États-Unis, pont vers Pasly). Le circuit se recale (décalage, rotation, échelle) puis s'aligne sur les rues |
-| **Routes** | relance l'alignement des points et des tracés sur les vraies rues (internet requis, fait automatiquement au 1er lancement) |
-| **Voies secondaires / prioritaires** | bascule d'un itinéraire à l'autre |
-| **Éditer** | glisser un point = le déplacer · le toucher = renommer la rue |
-| **Exporter** | télécharge tes corrections (`itineraire3-salage.json`) |
-| **Réinit.** | efface corrections et progression |
+| **Suivre** | garde la carte centrée sur ta position |
+| **Voix** | annonce chaque point à voix haute, en français |
+| **Caler** | recale le circuit sur la carte (voir plus haut) |
+| **Routes** | colle les points et les tracés sur les vraies rues (réseau nécessaire) |
+| **Voies secondaires / prioritaires** | passe d'un itinéraire à l'autre |
+| **Éditer** | glisse un point pour le corriger, touche-le pour renommer la rue |
+| **Exporter** | enregistre tes corrections dans un fichier |
+| **Réinit.** | efface le calage, les corrections et la progression |
 
-## ⚠️ Précision des points
+Sur la carte : 🔴 voies prioritaires, 🔵 voies secondaires, 🔵 gros point bleu = ta position.
 
-Les points ont été **relevés sur des photos de plans papier**, puis convertis en GPS : ils sont approximatifs, et beaucoup de voies secondaires s'appellent encore « Voie secondaire ».
+---
 
-👉 Fais un premier passage en mode **Éditer** pour recaler les points et nommer les rues.
-Tu peux aussi modifier la liste des points et le calage (`CALAGE`) directement dans `data.js`.
+## ✏️ Corriger un point
 
-## 📁 Fichiers
+Un point est mal placé ou une rue porte un mauvais nom ?
+
+1. Appuie sur **Éditer**.
+2. **Glisse** le point à la bonne place, ou **touche-le** pour changer le nom de la rue.
+3. Appuie de nouveau sur **Éditer** pour terminer.
+
+Tes corrections restent enregistrées sur ton téléphone.
+
+---
+
+## ❓ Problèmes fréquents
+
+| Problème | Solution |
+|---|---|
+| Le GPS ne démarre pas | Autorise la localisation pour le site dans les réglages du navigateur |
+| La carte reste grise | Vérifie ta connexion, puis recharge la page |
+| Les tracés sont en pointillés | Appuie sur **Routes** avec du réseau |
+| Les points sont décalés | Refais le calage avec **Caler** |
+| L'ancienne version s'affiche | Ferme complètement l'application, puis rouvre-la |
+
+---
+
+## ⚠️ À savoir
+
+- Les positions viennent de photos de plans : elles sont **approximatives** tant que le calage n'est pas fait, et certaines voies secondaires portent un nom générique.
+- Cette application est une **aide à la navigation** : respecte toujours le code de la route et la signalisation.
+
+---
+
+## 🛠️ Pour les développeurs
+
+Application web (PWA) en HTML / JavaScript pur, sans framework ni étape de build.
+Technologies open source : [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) · [OSRM](https://project-osrm.org).
 
 ```
 gps-salage/
-├── index.html            interface + logique de guidage
-├── data.js               points des deux itinéraires + calage GPS
-├── sw.js                 service worker (hors-ligne)
+├── index.html            interface et logique de guidage
+├── data.js               points des deux itinéraires et calage GPS
+├── sw.js                 service worker (mode hors-ligne)
 ├── manifest.webmanifest  installation sur téléphone
-└── icon.svg              icône de l'app
+└── icon.svg              icône
 ```
 
-## 📜 Licences
-
-Code : libre d'utilisation. Cartes : © contributeurs d'[OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL).
+Tester en local : `python -m http.server 8000`, puis ouvre <http://localhost:8000>.
+Déploiement : GitHub Pages, branche `main`, dossier `/ (root)`.
