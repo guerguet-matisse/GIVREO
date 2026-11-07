@@ -1,3 +1,4 @@
+// © 2026 Matisse Guerguet – Tous droits réservés. Voir le fichier LICENSE.
 // Itinéraire n°3 – circuit de salage (Soissons)
 // Les points ont été relevés en pixels sur les photos des deux plans, puis convertis en GPS
 // avec le calage ci-dessous. Ce sont des POSITIONS APPROXIMATIVES : ajuste-les avec le mode

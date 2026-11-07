@@ -1,3 +1,4 @@
+// © 2026 Matisse Guerguet – Tous droits réservés. Voir le fichier LICENSE.
 // Service worker : l'app marche hors-ligne, et les tuiles de carte déjà vues sont gardées.
 const APP = "gps-salage-app-v3", TUILES = "gps-salage-tuiles-v1";
 const FICHIERS = ["./", "index.html", "data.js", "manifest.webmanifest", "icon.svg",

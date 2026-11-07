@@ -10,7 +10,7 @@ Voies prioritaires, puis voies secondaires · points numérotés · noms de rues
 
 ![Gratuit](https://img.shields.io/badge/gratuit-oui-5be39a)
 ![Sans installation](https://img.shields.io/badge/installation-depuis%20le%20navigateur-3ea8ff)
-![Open source](https://img.shields.io/badge/open%20source-oui-ff5a4d)
+![Licence](https://img.shields.io/badge/licence-tous%20droits%20r%C3%A9serv%C3%A9s-ff5a4d)
 
 </div>
 
@@ -106,7 +106,7 @@ Tes corrections restent enregistrées sur ton téléphone.
 ## 🛠️ Pour les développeurs
 
 Application web (PWA) en HTML / JavaScript pur, sans framework ni étape de build.
-Technologies open source : [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) · [OSRM](https://project-osrm.org).
+Composants tiers : [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) · [OSRM](https://project-osrm.org).
 
 ```
 gps-salage/
@@ -114,8 +114,17 @@ gps-salage/
 ├── data.js               points des deux itinéraires et calage GPS
 ├── sw.js                 service worker (mode hors-ligne)
 ├── manifest.webmanifest  installation sur téléphone
-└── icon.svg              icône
+├── icon.svg              icône
+└── LICENSE               licence propriétaire
 ```
 
 Tester en local : `python -m http.server 8000`, puis ouvre <http://localhost:8000>.
 Déploiement : GitHub Pages, branche `main`, dossier `/ (root)`.
+
+---
+
+## 📜 Licence
+
+© 2026 Matisse Guerguet – **Tous droits réservés.**
+Le code, les données d'itinéraires et l'interface sont la propriété exclusive de l'auteur : toute copie, modification, redistribution ou réutilisation sans autorisation écrite est interdite. L'utilisation de l'application en ligne reste libre.
+Les composants tiers (Leaflet, OpenStreetMap, OSRM) gardent leurs propres licences. Voir le fichier [LICENSE](LICENSE).
