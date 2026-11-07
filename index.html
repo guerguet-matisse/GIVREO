@@ -1,342 +1,114 @@
 <!doctype html>
 <!-- © 2026 Matisse Guerguet – Tous droits réservés. Voir le fichier LICENSE. -->
-<html lang="fr">
+<html lang="fr" data-theme="nuit">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0d1b26">
+<meta name="theme-color" content="#0b1620">
+<meta name="description" content="Guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
 <title>GPS Salage – Itinéraire 3</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
-<style>
-  :root {
-    --nuit: #0d1b26; --nuit2: #14283a; --sel: #eef4f7; --gris: #8fa6b5;
-    --rouge: #ff5a4d; --bleu: #3ea8ff; --vert: #5be39a;
-  }
-  * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; background: var(--nuit); color: var(--sel);
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-  #app { display: flex; flex-direction: column; height: 100%; padding-top: env(safe-area-inset-top, 0px); }
-  #guide { background: var(--nuit2); padding: 10px 14px 12px; border-bottom: 4px solid var(--rouge); }
-  #guide.secondaire { border-bottom-color: var(--bleu); }
-  #ligne1 { display: flex; align-items: baseline; gap: 10px; color: var(--gris); font-size: 13px; }
-  #ligne1 b { color: var(--sel); font-weight: 600; }
-  #rue { font-size: 24px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; }
-  #infos { display: flex; align-items: center; gap: 14px; font-size: 15px; color: var(--gris); }
-  #dist { font-size: 30px; font-weight: 800; color: var(--sel); font-variant-numeric: tabular-nums; }
-  #fleche { width: 34px; height: 34px; transition: transform .3s; }
-  #map { flex: 1; min-height: 0; }
-  #barre { display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--nuit2);
-    overflow-x: auto; }
-  button { font: inherit; font-weight: 600; font-size: 15px; min-height: 46px; padding: 0 14px; border-radius: 10px;
-    border: 1px solid #2d4659; background: var(--nuit); color: var(--sel); white-space: nowrap; }
-  button:focus-visible { outline: 3px solid var(--vert); outline-offset: 2px; }
-  button.on { background: var(--vert); color: #04210f; border-color: var(--vert); }
-  button.go { background: var(--sel); color: var(--nuit); border-color: var(--sel); }
-  .pt { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
-    color: #fff; font-weight: 800; font-size: 12px; border: 2px solid #fff; box-shadow: 0 1px 4px #0008; }
-  .pt.via { width: 10px; height: 10px; border-width: 1px; opacity: .8; }
-  .pt.fait { opacity: .35; }
-  .pt.cible { outline: 4px solid #ffe14d; }
-  #toast { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); z-index: 1000;
-    background: var(--sel); color: var(--nuit); padding: 10px 16px; border-radius: 10px; font-weight: 700;
-    box-shadow: 0 4px 16px #0006; display: none; max-width: 90%; text-align: center; }
-  @media (prefers-reduced-motion: reduce) { #fleche { transition: none; } }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div id="app">
-  <div id="guide">
-    <div id="ligne1"><b id="iti">Voies prioritaires</b><span id="prog">point 1 / 26</span></div>
-    <div id="rue">Appuie sur « Démarrer »</div>
-    <div id="infos">
-      <svg id="fleche" viewBox="0 0 24 24" fill="#eef4f7" aria-hidden="true"><path d="M12 2 20 21 12 17 4 21z"/></svg>
-      <span id="dist">–</span><span id="etat">GPS arrêté</span>
+  <header id="plaque" aria-live="polite">
+    <span id="badge">1</span>
+    <div>
+      <div id="rue">Appuie sur « Démarrer »</div>
+      <div id="sous"><span id="partTitre"></span> · <span id="prog"></span></div>
     </div>
+    <div id="nav">
+      <svg id="fleche" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 20 21 12 17 4 21z"/></svg>
+      <div id="dist">–</div>
+    </div>
+  </header>
+  <div id="stats">
+    <span id="sKm"></span><span id="sFin"></span><span id="sEtat">GPS arrêté</span><span id="sMeteo"></span>
   </div>
-  <div id="map"></div>
+  <div id="barre" role="progressbar" aria-label="Avancement de la tournée" aria-valuemin="0" aria-valuemax="100"><i id="barreI"></i></div>
+
+  <main id="map" aria-label="Carte"></main>
+  <div id="alerte" role="alert"></div>
   <div id="toast" role="status"></div>
-  <div id="barre">
-    <button id="bStart" class="go">Démarrer</button>
-    <button id="bPrec">◀ Précédent</button>
-    <button id="bSuiv">Suivant ▶</button>
-    <button id="bSuivi" class="on">Suivre</button>
-    <button id="bVoix">Voix</button>
-    <button id="bCaler">Caler</button>
-    <button id="bRoute">Routes</button>
-    <button id="bIti">Voies secondaires</button>
-    <button id="bEdit">Éditer</button>
-    <button id="bExport">Exporter</button>
-    <button id="bReset">Réinit.</button>
+  <div id="flottants">
+    <button id="bSuivi" class="rond on" aria-label="Centrer sur ma position" aria-pressed="true">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+    <button id="bNuit" class="rond" aria-label="Basculer jour / nuit">
+      <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg></button>
   </div>
+
+  <section id="feuille" hidden>
+    <div class="feuille-tete"><h2 id="feuilleTitre"></h2><button id="fermer" aria-label="Fermer">✕</button></div>
+    <div class="feuille-corps">
+
+      <div id="p-tournee" class="panneau" hidden>
+        <div id="meteoCarte" class="carte">Météo…</div>
+        <label class="champ">Tournée<select id="selTournee"></select></label>
+        <div class="seg" id="segParts"></div>
+        <div id="liste" class="liste"></div>
+        <h3>Outils</h3>
+        <div class="outils">
+          <button id="bCaler">Caler le circuit</button>
+          <button id="bRoute">Aligner sur les rues</button>
+          <button id="bRec">Enregistrer ma trace</button>
+          <button id="bEffTrace">Effacer ma trace</button>
+          <button id="bEdit">Éditer les points</button>
+          <button id="bImport">Importer GPX / JSON</button>
+          <button id="bGpx">Exporter GPX</button>
+          <button id="bJson">Exporter JSON</button>
+        </div>
+        <input type="file" id="fichier" accept=".gpx,.json,application/gpx+xml,application/json" hidden>
+      </div>
+
+      <div id="p-journal" class="panneau" hidden>
+        <div id="jCourant" class="carte"></div>
+        <label class="champ">Sel utilisé (kg)<input id="jSel" type="number" inputmode="decimal" min="0" step="10"></label>
+        <label class="champ">Notes<textarea id="jNotes" rows="3" placeholder="Incident, état de la route, remarque…"></textarea></label>
+        <div class="outils">
+          <button id="jFin">Terminer la tournée</button>
+          <button id="jCsv">Exporter CSV</button>
+          <button id="jPdf">Imprimer / PDF</button>
+        </div>
+        <h3>Historique</h3>
+        <div id="jListe" class="liste"></div>
+      </div>
+
+      <div id="p-reglages" class="panneau" hidden>
+        <div class="champ"><span>Thème</span>
+          <div class="seg" id="segTheme"><button data-v="auto">Auto</button><button data-v="nuit">Nuit</button><button data-v="jour">Jour</button></div></div>
+        <div class="champ"><span>Taille du texte</span>
+          <div class="seg" id="segTaille"><button data-v="1">Normal</button><button data-v="1.15">Grand</button><button data-v="1.3">Très grand</button></div></div>
+        <label class="ligne"><span>Guidage vocal</span><input type="checkbox" id="rVoix"></label>
+        <label class="champ"><span>Distance de validation d'un point : <b id="rRayonV"></b></span><input type="range" id="rRayon" min="20" max="80" step="5"></label>
+        <label class="champ">Vitesse moyenne pour l'heure de fin (km/h)<input type="number" id="rVitesse" min="5" max="60" inputmode="numeric"></label>
+        <button id="rReset" class="danger">Tout réinitialiser</button>
+        <p class="mentions">© 2026 Matisse Guerguet – Tous droits réservés.<br>Cartes © contributeurs d'OpenStreetMap · itinéraires OSRM · météo Open-Meteo. Le risque de verglas est indicatif et ne remplace pas la vigilance Météo-France.</p>
+      </div>
+    </div>
+  </section>
+
+  <footer id="dock">
+    <div id="commandes">
+      <button id="bPrec" aria-label="Point précédent">◀</button>
+      <button id="bStart">Démarrer</button>
+      <button id="bSuiv" aria-label="Point suivant">▶</button>
+    </div>
+    <nav id="onglets">
+      <button data-p="tournee">Tournée</button>
+      <button data-p="journal">Journal</button>
+      <button data-p="reglages">Réglages</button>
+    </nav>
+  </footer>
 </div>
+<div id="impression"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="data.js"></script>
-<script>
-(() => {
-  const CLE = "gps-salage-v2";
-  const RAYON_ARRIVEE = 35; // mètres
-  const $ = (id) => document.getElementById(id);
-
-  // ---------- état ----------
-  let etat = { iti: 0, idx: [0, 0], edits: {}, voix: false, calage: null, sn: [null, null], nm: [null, null], geo: [null, null] };
-  try { Object.assign(etat, JSON.parse(localStorage.getItem(CLE) || "{}")); } catch (e) {}
-  const sauver = () => { try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) {} };
-
-  // ---------- conversion plan -> GPS (avec calage à 2 points : rotation + échelle + décalage) ----------
-  const M = CALAGE.metresParPixel, LAT0 = CALAGE.refLat, LON0 = CALAGE.refLon;
-  const MLAT = 111320, MLON = 111320 * Math.cos((LAT0 * Math.PI) / 180);
-  // mètres locaux (est, nord) depuis un pixel du plan : nord = droite de l'image, est = bas
-  const pxVersM = (x, y) => [(y - CALAGE.refY) * M, (x - CALAGE.refX) * M];
-  const mVersGps = (e, n) => [LAT0 + n / MLAT, LON0 + e / MLON];
-  const gpsVersM = (ll) => [(ll[1] - LON0) * MLON, (ll[0] - LAT0) * MLAT];
-  function brut(p) { // p = [num, x, y, nom]
-    let [e, n] = pxVersM(p[1], p[2]);
-    if (etat.calage) { const { a, b } = etat.calage;            // z' = a*z + b (nombres complexes)
-      const re = a[0] * e - a[1] * n + b[0], im = a[0] * n + a[1] * e + b[1]; e = re; n = im; }
-    return mVersGps(e, n);
-  }
-  const generique = (nom) => /^(Voie secondaire|Rue au|Liaison)/.test(nom);
-
-  // points finaux : correction manuelle > point aligné sur la rue > point brut
-  let pts = [];
-  function construire() {
-    pts = ITINERAIRES.map((it, k) => it.points.map((p, i) => {
-      const e = etat.edits[k + ":" + i] || {};
-      const alignee = etat.sn[k] && etat.sn[k][i];
-      const nomRoute = etat.nm[k] && etat.nm[k][i];
-      return { num: p[0], ll: e.ll || alignee || brut(p),
-        nom: e.nom || (generique(p[3]) && nomRoute ? nomRoute : p[3]) };
-    }));
-  }
-  construire();
-  const nbNum = (k) => pts[k].filter((p) => p.num !== null).length;
-  const cible = () => pts[etat.iti][etat.idx[etat.iti]];
-
-  // ---------- carte ----------
-  const map = L.map("map", { zoomControl: false }).setView(pts[0][0].ll, 15);
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    maxZoom: 19, attribution: "© les contributeurs d'OpenStreetMap",
-  }).addTo(map);
-  L.control.zoom({ position: "topright" }).addTo(map);
-
-  const traces = [], marqueurs = [[], []];
-  let editMode = false, suivre = true, posMarker, precision, calageEtape = 0, calageClics = [];
-
-  function dessinerTraces() {
-    traces.forEach((t) => t.remove()); traces.length = 0;
-    ITINERAIRES.forEach((it, k) => {
-      const ll = etat.geo[k] || pts[k].map((p) => p.ll);
-      traces.push(L.polyline(ll, { color: it.couleur, weight: 5, opacity: k === etat.iti ? 0.9 : 0.35,
-        dashArray: etat.geo[k] ? null : "8 8" }).addTo(map));
-    });
-  }
-
-  function icone(k, i) {
-    const p = pts[k][i]; const via = p.num === null;
-    const cls = ["pt", via ? "via" : "", i < etat.idx[k] ? "fait" : "", (k === etat.iti && i === etat.idx[k]) ? "cible" : ""].join(" ");
-    return L.divIcon({ className: "", iconSize: via ? [10, 10] : [26, 26], iconAnchor: via ? [5, 5] : [13, 13],
-      html: `<div class="${cls}" style="background:${ITINERAIRES[k].couleur}">${via ? "" : p.num}</div>` });
-  }
-
-  function dessinerMarqueurs() {
-    marqueurs.flat().forEach((m) => m.remove()); marqueurs[0] = []; marqueurs[1] = [];
-    pts.forEach((liste, k) => liste.forEach((p, i) => {
-      const m = L.marker(p.ll, { icon: icone(k, i), draggable: editMode, zIndexOffset: k === etat.iti ? 500 : 0 }).addTo(map);
-      m.bindTooltip(`${p.num !== null ? "n°" + p.num + " · " : ""}${p.nom}`);
-      m.on("dragend", () => { const ll = m.getLatLng(); p.ll = [ll.lat, ll.lng];
-        etat.edits[k + ":" + i] = Object.assign(etat.edits[k + ":" + i] || {}, { ll: p.ll });
-        sauver(); clearTimeout(dragend.h); dragend.h = setTimeout(aligner, 900); });
-      m.on("click", () => {
-        if (editMode) { const n = prompt("Nom de la rue pour ce point :", p.nom);
-          if (n) { p.nom = n; etat.edits[k + ":" + i] = Object.assign(etat.edits[k + ":" + i] || {}, { nom: n });
-            sauver(); m.setTooltipContent(n); majGuide(); } }
-        else { etat.iti = k; etat.idx[k] = i; sauver(); rafraichir(); }
-      });
-      marqueurs[k].push(m);
-    }));
-  }
-  const dragend = {};
-
-  function rafraichir() { dessinerTraces(); dessinerMarqueurs(); majGuide(); }
-
-  // ---------- guidage ----------
-  function distance(a, b) { // haversine, mètres
-    const R = 6371000, r = Math.PI / 180;
-    const dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
-    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
-    return 2 * R * Math.asin(Math.sqrt(h));
-  }
-  function cap(a, b) {
-    const r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r);
-    const x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r);
-    return (Math.atan2(y, x) / r + 360) % 360;
-  }
-  const fmt = (m) => (m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m");
-
-  let position = null, orientation = 0;
-  function majGuide() {
-    const k = etat.iti, p = cible();
-    $("guide").className = k === 1 ? "secondaire" : "";
-    $("iti").textContent = ITINERAIRES[k].titre;
-    const numPos = pts[k].slice(0, etat.idx[k] + 1).filter((q) => q.num !== null).length;
-    $("prog").textContent = `point ${Math.max(numPos, 1)} / ${nbNum(k)}`;
-    $("rue").textContent = (p.num !== null ? `n°${p.num} · ` : "") + p.nom;
-    $("bIti").textContent = k === 0 ? "Voies secondaires" : "Voies prioritaires";
-    if (position) {
-      $("dist").textContent = fmt(distance(position, p.ll));
-      $("fleche").style.transform = `rotate(${cap(position, p.ll) - orientation}deg)`;
-    }
-  }
-
-  function parler(txt) {
-    if (!etat.voix || !("speechSynthesis" in window)) return;
-    speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(txt); u.lang = "fr-FR"; speechSynthesis.speak(u);
-  }
-  function toast(txt, ms = 4000) { const t = $("toast"); t.textContent = txt; t.style.display = "block";
-    clearTimeout(toast.h); toast.h = setTimeout(() => (t.style.display = "none"), ms); }
-
-  function avancer(delta) {
-    const k = etat.iti, n = pts[k].length;
-    let i = etat.idx[k] + delta;
-    if (i >= n) {
-      if (k === 0) { etat.iti = 1; toast("Voies prioritaires terminées. Place aux voies secondaires.");
-        parler("Voies prioritaires terminées. Début des voies secondaires.");
-      } else { toast("Circuit terminé."); parler("Circuit terminé."); i = n - 1; }
-    } else if (i < 0) i = 0;
-    if (etat.iti === k) etat.idx[k] = i;
-    sauver(); rafraichir();
-    const p = cible();
-    if (delta > 0) parler(`${p.num !== null ? "Point " + p.num + ". " : ""}${p.nom}`);
-    if (suivre) map.panTo(p.ll);
-  }
-
-  // ---------- GPS ----------
-  let watch = null, wake = null;
-  async function demarrer() {
-    if (!("geolocation" in navigator)) { toast("GPS indisponible sur cet appareil."); return; }
-    if (watch !== null) { navigator.geolocation.clearWatch(watch); watch = null;
-      $("bStart").textContent = "Démarrer"; $("etat").textContent = "GPS arrêté"; if (wake) wake.release(); return; }
-    try { wake = await navigator.wakeLock?.request("screen"); } catch (e) {}
-    $("bStart").textContent = "Arrêter"; $("etat").textContent = "recherche du GPS…";
-    watch = navigator.geolocation.watchPosition((g) => {
-      position = [g.coords.latitude, g.coords.longitude];
-      if (g.coords.heading != null && !isNaN(g.coords.heading)) orientation = g.coords.heading;
-      $("etat").textContent = `GPS ±${Math.round(g.coords.accuracy)} m`;
-      if (!posMarker) { posMarker = L.circleMarker(position, { radius: 9, color: "#fff", weight: 3, fillColor: "#2a7bff", fillOpacity: 1 }).addTo(map);
-        precision = L.circle(position, { radius: g.coords.accuracy, weight: 1, color: "#2a7bff", fillOpacity: 0.1 }).addTo(map); }
-      posMarker.setLatLng(position); precision.setLatLng(position).setRadius(g.coords.accuracy);
-      if (suivre) map.panTo(position, { animate: true });
-      if (distance(position, cible().ll) < RAYON_ARRIVEE) avancer(1); else majGuide();
-    }, () => { $("etat").textContent = "GPS refusé ou indisponible"; toast("Autorise la localisation pour ce site."); },
-    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
-  }
-  window.addEventListener("deviceorientationabsolute", (e) => { if (e.alpha != null && !position) orientation = 360 - e.alpha; });
-
-  // ---------- alignement sur les rues (OSRM) ----------
-  // Chaque point est ramené sur la rue la plus proche, puis le tracé suit les routes entre les points.
-  // Si un point est trop loin de toute route, on élargit son rayon de recherche, puis on l'ignore.
-  let enCours = false;
-  async function routeOsrm(base) {
-    const radii = base.map(() => 300), use = base.map((_, i) => i);
-    for (let essai = 0; essai < 25 && use.length > 1; essai++) {
-      const coords = use.map((i) => base[i][1].toFixed(6) + "," + base[i][0].toFixed(6)).join(";");
-      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&continue_straight=false&radiuses=${use.map((i) => radii[i]).join(";")}`;
-      const rep = await fetch(url);
-      const r = await rep.json().catch(() => ({}));
-      if (r.code === "Ok" && r.routes && r.routes[0]) return { r, use };
-      if (r.code === "NoSegment") {
-        const m = /(\d+)/.exec(r.message || ""); const j = m ? +m[1] : -1;
-        if (j >= 0 && j < use.length) { const i = use[j];
-          if (radii[i] < 3000) radii[i] *= 4; else use.splice(j, 1); continue; }
-      }
-      throw new Error(r.message || r.code || ("HTTP " + rep.status));
-    }
-    throw new Error("aucun tracé possible");
-  }
-  async function aligner(silencieux) {
-    if (enCours) return; enCours = true;
-    if (silencieux !== true) toast("Alignement sur les rues…", 8000);
-    try {
-      for (let k = 0; k < 2; k++) {
-        const base = ITINERAIRES[k].points.map((p, i) => { const e = etat.edits[k + ":" + i]; return e && e.ll ? e.ll : brut(p); });
-        const { r, use } = await routeOsrm(base);
-        etat.geo[k] = r.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
-        etat.sn[k] = base.map(() => null); etat.nm[k] = base.map(() => "");
-        r.waypoints.forEach((w, j) => { etat.sn[k][use[j]] = [w.location[1], w.location[0]]; etat.nm[k][use[j]] = w.name || ""; });
-      }
-      sauver(); construire(); rafraichir();
-      toast("Points et tracés alignés sur les rues (OpenStreetMap).");
-    } catch (e) { toast("Alignement impossible : " + (e.message || e) + ". Vérifie le réseau puis appuie sur « Routes ».", 7000); }
-    enCours = false;
-  }
-
-  // ---------- calage en 3 touches (décalage + rotation + échelle, moindres carrés) ----------
-  const REF = [[0, 0], [0, 5], [0, 17]]; // début du circuit · rond-point des États-Unis · pont vers Pasly
-  const QUOI = ["le point n°1 : début du circuit, sur l'avenue de Coucy",
-                "le rond-point des États-Unis (point n°6)",
-                "le pont sur l'Aisne vers Pasly (point n°12)"];
-  function calerDebut() {
-    calageEtape = 1; calageClics = [];
-    toast("Calage 1/3 : touche sur la carte " + QUOI[0] + ".", 12000);
-  }
-  map.on("click", (ev) => {
-    if (!calageEtape) return;
-    calageClics.push([ev.latlng.lat, ev.latlng.lng]);
-    if (calageEtape < 3) { calageEtape++;
-      toast(`Calage ${calageEtape}/3 : touche ${QUOI[calageEtape - 1]}.`, 12000); return; }
-    calageEtape = 0;
-    const z = REF.map(([k, i]) => { const p = ITINERAIRES[k].points[i]; return pxVersM(p[1], p[2]); });
-    const w = calageClics.map(gpsVersM), n = z.length;
-    const mz = [z.reduce((t, v) => t + v[0], 0) / n, z.reduce((t, v) => t + v[1], 0) / n];
-    const mw = [w.reduce((t, v) => t + v[0], 0) / n, w.reduce((t, v) => t + v[1], 0) / n];
-    let num = [0, 0], den = 0;
-    for (let i = 0; i < n; i++) {
-      const dz = [z[i][0] - mz[0], z[i][1] - mz[1]], dw = [w[i][0] - mw[0], w[i][1] - mw[1]];
-      num[0] += dz[0] * dw[0] + dz[1] * dw[1]; num[1] += dz[0] * dw[1] - dz[1] * dw[0]; den += dz[0] ** 2 + dz[1] ** 2;
-    }
-    const a = [num[0] / den, num[1] / den];
-    const b = [mw[0] - (a[0] * mz[0] - a[1] * mz[1]), mw[1] - (a[0] * mz[1] + a[1] * mz[0])];
-    etat.calage = { a, b }; etat.edits = {}; etat.sn = [null, null]; etat.nm = [null, null]; etat.geo = [null, null];
-    sauver(); construire(); rafraichir();
-    map.fitBounds(L.latLngBounds(pts.flat().map((p) => p.ll)), { padding: [20, 20] });
-    aligner();
-  });
-
-  // ---------- boutons ----------
-  $("bStart").onclick = demarrer;
-  $("bPrec").onclick = () => avancer(-1);
-  $("bSuiv").onclick = () => avancer(1);
-  $("bSuivi").onclick = (e) => { suivre = !suivre; e.target.classList.toggle("on", suivre); if (suivre) map.panTo((position || cible().ll)); };
-  $("bVoix").onclick = (e) => { etat.voix = !etat.voix; e.target.classList.toggle("on", etat.voix); sauver();
-    if (etat.voix) parler("Guidage vocal activé"); };
-  $("bCaler").onclick = calerDebut;
-  $("bRoute").onclick = () => aligner();
-  $("bIti").onclick = () => { etat.iti = etat.iti === 0 ? 1 : 0; sauver(); rafraichir(); map.panTo(cible().ll); };
-  $("bEdit").onclick = (e) => { editMode = !editMode; e.target.classList.toggle("on", editMode);
-    toast(editMode ? "Mode édition : glisse un point, touche-le pour renommer la rue." : "Édition terminée.");
-    dessinerMarqueurs(); };
-  $("bExport").onclick = () => {
-    const out = ITINERAIRES.map((it, k) => ({ id: it.id, titre: it.titre,
-      points: pts[k].map((p) => ({ numero: p.num, rue: p.nom, lat: +p.ll[0].toFixed(6), lon: +p.ll[1].toFixed(6) })) }));
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
-    a.download = "itineraire3-salage.json"; a.click();
-  };
-  $("bReset").onclick = () => { if (confirm("Effacer le calage, les corrections et la progression ?")) { localStorage.removeItem(CLE); location.reload(); } };
-  $("bVoix").classList.toggle("on", etat.voix);
-  $("bSuivi").classList.toggle("on", suivre);
-
-  rafraichir();
-  map.fitBounds(L.latLngBounds(pts.flat().map((p) => p.ll)), { padding: [20, 20] });
-  if (!etat.calage) toast("Première utilisation : appuie sur « Caler » et touche 3 repères sur la carte pour recaler le circuit.", 15000);
-  else if (!etat.geo[0] || !etat.geo[1]) aligner();
-  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
-})();
-</script>
+<script src="lib.js"></script>
+<script src="app.js"></script>
 </body>
 </html>

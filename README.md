@@ -2,14 +2,14 @@
 
 # 🧂 GPS Salage
 
-**Le guidage GPS du circuit de salage (Soissons)**
+**Le guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)**
 
-Voies prioritaires, puis voies secondaires · points numérotés · noms de rues
+Voies prioritaires, puis voies secondaires · points numérotés · noms de rues · journal de tournée · météo verglas
 
 ### 👉 [Ouvrir l'application](https://guerguet-matisse.github.io/GPS-salage/) 👈
 
 ![Gratuit](https://img.shields.io/badge/gratuit-oui-5be39a)
-![Sans installation](https://img.shields.io/badge/installation-depuis%20le%20navigateur-3ea8ff)
+![Hors-ligne](https://img.shields.io/badge/mode-hors--ligne-3ea8ff)
 ![Licence](https://img.shields.io/badge/licence-tous%20droits%20r%C3%A9serv%C3%A9s-ff5a4d)
 
 </div>
@@ -18,69 +18,113 @@ Voies prioritaires, puis voies secondaires · points numérotés · noms de rues
 
 ## 📱 Installer l'application sur ton téléphone
 
-Ouvre ce lien sur ton téléphone : **https://guerguet-matisse.github.io/GPS-salage/**
+Ouvre **https://guerguet-matisse.github.io/GPS-salage/** sur ton téléphone.
 
 | Téléphone | Comment faire |
 |---|---|
-| **Android** (Chrome) | Menu **⋮** en haut à droite → **Installer l'application** |
-| **iPhone** (Safari) | Bouton **Partager** → **Sur l'écran d'accueil** |
+| **Android** (Chrome) | Menu **⋮** → **Installer l'application** |
+| **iPhone** (Safari) | **Partager** → **Sur l'écran d'accueil** |
 
-L'icône **GPS Salage** apparaît alors avec tes autres applications.
-
-> 💡 Ouvre l'application une première fois **avec du réseau** : la carte se met en mémoire et fonctionne ensuite même si la connexion est mauvaise.
+> 💡 Ouvre l'application une première fois **avec du réseau** : la carte se met en mémoire et l'application démarre ensuite instantanément, même avec une mauvaise connexion.
 
 ---
 
 ## 🧭 Premier lancement : caler le circuit (1 minute)
 
-Les points du circuit viennent d'un plan papier. Pour qu'ils tombent bien sur les rues, il faut un petit calage à faire **une seule fois** :
+Les points viennent d'un plan papier. Pour qu'ils tombent sur les bonnes rues, fais ce calage **une seule fois** :
 
-1. Appuie sur **Caler**.
+1. Ouvre l'onglet **Tournée** → **Caler le circuit**.
 2. Touche sur la carte l'endroit de chaque repère demandé :
-   1. le **point n°1** : début du circuit, sur l'avenue de Coucy ;
+   1. le **point n°1** : début du circuit, avenue de Coucy ;
    2. le **rond-point des États-Unis** (point n°6) ;
    3. le **pont sur l'Aisne vers Pasly** (point n°12).
-3. L'application recale tout le circuit et le colle sur les rues. Attends le message de confirmation.
+3. L'application recale le circuit et le colle sur les rues. Attends le message de confirmation.
 
-Si les tracés restent en pointillés, appuie sur **Routes** (il faut du réseau).
+> 🎯 **Pour une précision parfaite** : roule le circuit une fois avec **Enregistrer ma trace** (voir plus bas). Ta vraie trace GPS remplace alors le tracé approximatif.
 
 ---
 
-## 🚚 Utiliser le guidage
+## 🚚 Pendant la tournée
 
-1. Appuie sur **Démarrer** et autorise la localisation.
-2. L'écran du haut indique la **rue**, le **numéro du point**, la **distance** et la **direction** à suivre.
-3. À moins de 35 m du point, l'application passe **automatiquement** au suivant.
-4. Après le dernier point des voies prioritaires, elle enchaîne sur les **voies secondaires**.
+Appuie sur **Démarrer** et autorise la localisation.
 
-### Les boutons
+- **La plaque de rue** en haut affiche la rue du prochain point, son numéro, la distance et la direction.
+- **La barre de progression** indique le pourcentage fait, les kilomètres restants et l'**heure de fin estimée**.
+- **Les points se valident tout seuls** à l'approche (35 m par défaut). Après les voies prioritaires, l'application enchaîne sur les secondaires.
+- **Les alertes d'approche** (à 300 m puis 100 m) préviennent avant chaque point, et surtout avant chaque **demi-tour**, par bannière, vibration et voix.
+- **« Hors itinéraire »** s'affiche en rouge si tu t'écartes de plus de 80 m du tracé.
+- L'**écran reste allumé** pendant le guidage.
 
-| Bouton | À quoi il sert |
+### Les boutons du bas
+
+| Bouton | Action |
 |---|---|
 | **Démarrer / Arrêter** | active ou coupe le GPS |
-| **◀ Précédent · Suivant ▶** | change de point à la main (toucher un numéro sur la carte marche aussi) |
-| **Suivre** | garde la carte centrée sur ta position |
-| **Voix** | annonce chaque point à voix haute, en français |
-| **Caler** | recale le circuit sur la carte (voir plus haut) |
-| **Routes** | colle les points et les tracés sur les vraies rues (réseau nécessaire) |
-| **Voies secondaires / prioritaires** | passe d'un itinéraire à l'autre |
-| **Éditer** | glisse un point pour le corriger, touche-le pour renommer la rue |
-| **Exporter** | enregistre tes corrections dans un fichier |
-| **Réinit.** | efface le calage, les corrections et la progression |
+| **◀ ▶** | point précédent / suivant à la main |
+| **Tournée** | liste des points, outils, météo |
+| **Journal** | heures, kilomètres, sel, notes, export |
+| **Réglages** | thème, taille du texte, voix, distance de validation |
 
-Sur la carte : 🔴 voies prioritaires, 🔵 voies secondaires, 🔵 gros point bleu = ta position.
+À droite de la carte : le bouton **⌖** garde la carte centrée sur toi (il se désactive si tu déplaces la carte), le bouton **☾** bascule jour / nuit.
+
+---
+
+## ❄️ Météo et risque de verglas
+
+L'onglet **Tournée** et la barre du haut affichent la température et un indicateur calculé sur les 12 prochaines heures (source : Open-Meteo, sans compte) :
+
+| Indicateur | Signification |
+|---|---|
+| 🟢 **Pas de gel** | rien à signaler |
+| 🟠 **Gel possible** | température ou sol proche de 0 °C, à surveiller |
+| 🔴 **Verglas probable** | gel et précipitations prévus, salage conseillé |
+
+> ⚠️ Indicatif seulement : il ne remplace pas la vigilance Météo-France.
+
+---
+
+## 📒 Journal de tournée
+
+Une tournée démarre quand tu appuies sur **Démarrer** et se termine à la fin du circuit (ou avec **Terminer la tournée**). L'application note :
+
+- l'heure de départ et de fin, la durée et les **kilomètres** parcourus ;
+- l'**heure de passage à chaque point** ;
+- la **quantité de sel** (à saisir) et tes **notes** ;
+- la météo au départ.
+
+**Exporter CSV** s'ouvre dans Excel, **Imprimer / PDF** génère un compte rendu à enregistrer en PDF.
+
+---
+
+## 🛰️ Enregistrer ta vraie trace (précision maximale)
+
+1. Onglet **Tournée** → **Enregistrer ma trace**.
+2. Roule la partie du circuit concernée (prioritaires ou secondaires).
+3. Appuie sur **Arrêter l'enregistrement**, puis accepte de **recaler les numéros de points** sur ta trace.
+
+La trace est simplifiée (quelques mètres de tolérance) pour rester légère. **Effacer ma trace** revient au tracé calculé.
+
+---
+
+## 🗺️ Autres circuits : import et export
+
+- **Importer GPX / JSON** : ajoute un autre circuit (itinéraire n°1, n°2…). Un GPX avec des points de passage devient une liste de points numérotés, un GPX avec une trace devient un tracé. Il apparaît dans le menu **Tournée**.
+- **Exporter GPX** : la partie en cours, avec ses points et sa trace, lisible dans les autres applications GPS.
+- **Exporter JSON** : sauvegarde les points de la tournée.
 
 ---
 
 ## ✏️ Corriger un point
 
-Un point est mal placé ou une rue porte un mauvais nom ?
+**Tournée → Éditer les points** : glisse un point à la bonne place, ou touche-le pour renommer la rue. Tes corrections restent enregistrées sur ton téléphone.
 
-1. Appuie sur **Éditer**.
-2. **Glisse** le point à la bonne place, ou **touche-le** pour changer le nom de la rue.
-3. Appuie de nouveau sur **Éditer** pour terminer.
+---
 
-Tes corrections restent enregistrées sur ton téléphone.
+## ♿ Confort de conduite
+
+- **Thème Auto / Nuit / Jour** : en Auto, la nuit tombe à 18 h et se lève à 7 h.
+- **Taille du texte** Normal / Grand / Très grand (**Réglages**).
+- Boutons larges, utilisables avec des gants.
 
 ---
 
@@ -90,35 +134,41 @@ Tes corrections restent enregistrées sur ton téléphone.
 |---|---|
 | Le GPS ne démarre pas | Autorise la localisation pour le site dans les réglages du navigateur |
 | La carte reste grise | Vérifie ta connexion, puis recharge la page |
-| Les tracés sont en pointillés | Appuie sur **Routes** avec du réseau |
-| Les points sont décalés | Refais le calage avec **Caler** |
+| Les tracés sont en pointillés | **Tournée → Aligner sur les rues** (réseau nécessaire) |
+| Les points sont décalés | Refais le calage, ou enregistre ta trace |
 | L'ancienne version s'affiche | Ferme complètement l'application, puis rouvre-la |
 
 ---
 
 ## ⚠️ À savoir
 
-- Les positions viennent de photos de plans : elles sont **approximatives** tant que le calage n'est pas fait, et certaines voies secondaires portent un nom générique.
+- Tant que le calage n'est pas fait, les positions sont **approximatives**, et certaines voies secondaires portent un nom générique.
+- Le **suivi en direct des camions** sur une carte commune n'est pas inclus : il demande un serveur.
 - Cette application est une **aide à la navigation** : respecte toujours le code de la route et la signalisation.
 
 ---
 
 ## 🛠️ Pour les développeurs
 
-Application web (PWA) en HTML / JavaScript pur, sans framework ni étape de build.
-Composants tiers : [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) · [OSRM](https://project-osrm.org).
+Application web (PWA) en HTML / CSS / JavaScript pur, sans framework ni étape de build.
+Composants tiers : [Leaflet](https://leafletjs.com) · [OpenStreetMap](https://www.openstreetmap.org/copyright) (ODbL) · [OSRM](https://project-osrm.org) · [Open-Meteo](https://open-meteo.com).
 
 ```
 gps-salage/
-├── index.html            interface et logique de guidage
-├── data.js               points des deux itinéraires et calage GPS
-├── sw.js                 service worker (mode hors-ligne)
+├── index.html            structure de l'interface
+├── style.css             thèmes nuit / jour, plaque de rue, panneaux
+├── app.js                carte, guidage, GPS, trace, journal, météo, import/export
+├── lib.js                calculs purs (géométrie, GPX, CSV, verglas) – testés sous Node
+├── data.js               points des deux itinéraires + calage GPS
+├── sw.js                 service worker (hors-ligne, tuiles plafonnées à 700)
 ├── manifest.webmanifest  installation sur téléphone
 ├── icon.svg              icône
 └── LICENSE               licence propriétaire
 ```
 
-Tester en local : `python -m http.server 8000`, puis ouvre <http://localhost:8000>.
+Performance : rendu des tracés en canvas, marqueurs mis à jour uniquement quand ils changent, logique GPS limitée à ~2 calculs par seconde, traces simplifiées (Douglas-Peucker), sauvegardes différées, chargement instantané grâce au cache.
+
+Tester en local : `python -m http.server 8000`, puis <http://localhost:8000>.
 Déploiement : GitHub Pages, branche `main`, dossier `/ (root)`.
 
 ---
@@ -127,4 +177,4 @@ Déploiement : GitHub Pages, branche `main`, dossier `/ (root)`.
 
 © 2026 Matisse Guerguet – **Tous droits réservés.**
 Le code, les données d'itinéraires et l'interface sont la propriété exclusive de l'auteur : toute copie, modification, redistribution ou réutilisation sans autorisation écrite est interdite. L'utilisation de l'application en ligne reste libre.
-Les composants tiers (Leaflet, OpenStreetMap, OSRM) gardent leurs propres licences. Voir le fichier [LICENSE](LICENSE).
+Les composants tiers (Leaflet, OpenStreetMap, OSRM, Open-Meteo) gardent leurs propres licences. Voir le fichier [LICENSE](LICENSE).

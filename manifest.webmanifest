@@ -7,5 +7,19 @@
   "orientation": "portrait",
   "background_color": "#0d1b26",
   "theme_color": "#0d1b26",
-  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "lang": "fr",
+  "categories": [
+    "navigation",
+    "utilities"
+  ],
+  "description": "Guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)",
+  "id": "./"
 }
