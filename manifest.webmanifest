@@ -1,0 +1,11 @@
+{
+  "name": "GPS Salage – Itinéraire 3",
+  "short_name": "GPS Salage",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d1b26",
+  "theme_color": "#0d1b26",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

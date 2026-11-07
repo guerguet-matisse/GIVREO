@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0d1b26">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>GPS Salage – Itinéraire 3</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  :root {
+    --nuit: #0d1b26; --nuit2: #14283a; --sel: #eef4f7; --gris: #8fa6b5;
+    --rouge: #ff5a4d; --bleu: #3ea8ff; --vert: #5be39a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--nuit); color: var(--sel);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  #app { display: flex; flex-direction: column; height: 100%; padding-top: env(safe-area-inset-top, 0px); }
+  #guide { background: var(--nuit2); padding: 10px 14px 12px; border-bottom: 4px solid var(--rouge); }
+  #guide.secondaire { border-bottom-color: var(--bleu); }
+  #ligne1 { display: flex; align-items: baseline; gap: 10px; color: var(--gris); font-size: 13px; }
+  #ligne1 b { color: var(--sel); font-weight: 600; }
+  #rue { font-size: 24px; font-weight: 700; line-height: 1.15; margin: 4px 0 2px; }
+  #infos { display: flex; align-items: center; gap: 14px; font-size: 15px; color: var(--gris); }
+  #dist { font-size: 30px; font-weight: 800; color: var(--sel); font-variant-numeric: tabular-nums; }
+  #fleche { width: 34px; height: 34px; transition: transform .3s; }
+  #map { flex: 1; min-height: 0; }
+  #barre { display: flex; gap: 8px; padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--nuit2);
+    overflow-x: auto; }
+  button { font: inherit; font-weight: 600; font-size: 15px; min-height: 46px; padding: 0 14px; border-radius: 10px;
+    border: 1px solid #2d4659; background: var(--nuit); color: var(--sel); white-space: nowrap; }
+  button:focus-visible { outline: 3px solid var(--vert); outline-offset: 2px; }
+  button.on { background: var(--vert); color: #04210f; border-color: var(--vert); }
+  button.go { background: var(--sel); color: var(--nuit); border-color: var(--sel); }
+  .pt { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%;
+    color: #fff; font-weight: 800; font-size: 12px; border: 2px solid #fff; box-shadow: 0 1px 4px #0008; }
+  .pt.via { width: 10px; height: 10px; border-width: 1px; opacity: .8; }
+  .pt.fait { opacity: .35; }
+  .pt.cible { outline: 4px solid #ffe14d; }
+  #toast { position: absolute; left: 50%; top: 150px; transform: translateX(-50%); z-index: 1000;
+    background: var(--sel); color: var(--nuit); padding: 10px 16px; border-radius: 10px; font-weight: 700;
+    box-shadow: 0 4px 16px #0006; display: none; max-width: 90%; text-align: center; }
+  @media (prefers-reduced-motion: reduce) { #fleche { transition: none; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="guide">
+    <div id="ligne1"><b id="iti">Voies prioritaires</b><span id="prog">point 1 / 26</span></div>
+    <div id="rue">Appuie sur « Démarrer »</div>
+    <div id="infos">
+      <svg id="fleche" viewBox="0 0 24 24" fill="#eef4f7" aria-hidden="true"><path d="M12 2 20 21 12 17 4 21z"/></svg>
+      <span id="dist">–</span><span id="etat">GPS arrêté</span>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div id="toast" role="status"></div>
+  <div id="barre">
+    <button id="bStart" class="go">Démarrer</button>
+    <button id="bPrec">◀ Précédent</button>
+    <button id="bSuiv">Suivant ▶</button>
+    <button id="bSuivi" class="on">Suivre</button>
+    <button id="bVoix">Voix</button>
+    <button id="bRoute">Routes</button>
+    <button id="bIti">Voies secondaires</button>
+    <button id="bEdit">Éditer</button>
+    <button id="bExport">Exporter</button>
+    <button id="bReset">Réinit.</button>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="data.js"></script>
+<script>
+(() => {
+  const CLE = "gps-salage-v1";
+  const RAYON_ARRIVEE = 35; // mètres
+  const $ = (id) => document.getElementById(id);
+
+  // ---------- état ----------
+  let etat = { iti: 0, idx: [0, 0], edits: {}, voix: false, snap: false };
+  try { Object.assign(etat, JSON.parse(localStorage.getItem(CLE) || "{}")); } catch (e) {}
+  const sauver = () => { try { localStorage.setItem(CLE, JSON.stringify(etat)); } catch (e) {} };
+
+  // points en GPS (avec corrections éventuelles de l'éditeur)
+  const pts = ITINERAIRES.map((it, k) => it.points.map((p, i) => {
+    const e = etat.edits[k + ":" + i] || {};
+    return { num: p[0], nom: e.nom || p[3], ll: e.ll || pixelVersGps(p[1], p[2]) };
+  }));
+  const nbNum = (k) => pts[k].filter((p) => p.num !== null).length;
+  const cible = () => pts[etat.iti][etat.idx[etat.iti]];
+
+  // ---------- carte ----------
+  const map = L.map("map", { zoomControl: false }).setView(pts[0][0].ll, 15);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "© les contributeurs d'OpenStreetMap",
+  }).addTo(map);
+  L.control.zoom({ position: "topright" }).addTo(map);
+
+  const traces = [], marqueurs = [[], []];
+  let editMode = false, suivre = true, posMarker, precision;
+
+  function dessinerTraces() {
+    traces.forEach((t) => t.remove()); traces.length = 0;
+    ITINERAIRES.forEach((it, k) => {
+      const ll = (etat["geo" + k]) || pts[k].map((p) => p.ll);
+      const t = L.polyline(ll, { color: it.couleur, weight: 5, opacity: k === etat.iti ? 0.9 : 0.35,
+        dashArray: etat["geo" + k] ? null : "8 8" }).addTo(map);
+      traces.push(t);
+    });
+  }
+
+  function icone(k, i) {
+    const p = pts[k][i]; const via = p.num === null;
+    const cls = ["pt", via ? "via" : "", i < etat.idx[k] ? "fait" : "", (k === etat.iti && i === etat.idx[k]) ? "cible" : ""].join(" ");
+    return L.divIcon({ className: "", iconSize: via ? [10, 10] : [26, 26], iconAnchor: via ? [5, 5] : [13, 13],
+      html: `<div class="${cls}" style="background:${ITINERAIRES[k].couleur}">${via ? "" : p.num}</div>` });
+  }
+
+  function dessinerMarqueurs() {
+    marqueurs.flat().forEach((m) => m.remove()); marqueurs[0] = []; marqueurs[1] = [];
+    pts.forEach((liste, k) => liste.forEach((p, i) => {
+      const m = L.marker(p.ll, { icon: icone(k, i), draggable: editMode, zIndexOffset: k === etat.iti ? 500 : 0 }).addTo(map);
+      m.bindTooltip(`${p.num !== null ? "n°" + p.num + " · " : ""}${p.nom}`);
+      m.on("dragend", () => { const ll = m.getLatLng(); p.ll = [ll.lat, ll.lng];
+        etat.edits[k + ":" + i] = Object.assign(etat.edits[k + ":" + i] || {}, { ll: p.ll });
+        delete etat["geo" + k]; sauver(); dessinerTraces(); });
+      m.on("click", () => {
+        if (editMode) { const n = prompt("Nom de la rue pour ce point :", p.nom);
+          if (n) { p.nom = n; etat.edits[k + ":" + i] = Object.assign(etat.edits[k + ":" + i] || {}, { nom: n });
+            sauver(); m.setTooltipContent(n); majGuide(); } }
+        else { etat.iti = k; etat.idx[k] = i; sauver(); rafraichir(); }
+      });
+      marqueurs[k].push(m);
+    }));
+  }
+
+  function rafraichir() { dessinerTraces(); dessinerMarqueurs(); majGuide(); }
+
+  // ---------- guidage ----------
+  function distance(a, b) { // haversine, mètres
+    const R = 6371000, r = Math.PI / 180;
+    const dLat = (b[0] - a[0]) * r, dLon = (b[1] - a[1]) * r;
+    const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[0] * r) * Math.cos(b[0] * r) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.sqrt(h));
+  }
+  function cap(a, b) {
+    const r = Math.PI / 180, y = Math.sin((b[1] - a[1]) * r) * Math.cos(b[0] * r);
+    const x = Math.cos(a[0] * r) * Math.sin(b[0] * r) - Math.sin(a[0] * r) * Math.cos(b[0] * r) * Math.cos((b[1] - a[1]) * r);
+    return (Math.atan2(y, x) / r + 360) % 360;
+  }
+  const fmt = (m) => (m >= 1000 ? (m / 1000).toFixed(1) + " km" : Math.round(m) + " m");
+
+  let position = null, orientation = 0;
+  function majGuide() {
+    const k = etat.iti, p = cible();
+    $("guide").className = k === 1 ? "secondaire" : "";
+    $("iti").textContent = ITINERAIRES[k].titre;
+    const numPos = pts[k].slice(0, etat.idx[k] + 1).filter((q) => q.num !== null).length;
+    $("prog").textContent = `point ${Math.max(numPos, 1)} / ${nbNum(k)}`;
+    $("rue").textContent = (p.num !== null ? `n°${p.num} · ` : "") + p.nom;
+    $("bIti").textContent = k === 0 ? "Voies secondaires" : "Voies prioritaires";
+    if (position) {
+      $("dist").textContent = fmt(distance(position, p.ll));
+      $("fleche").style.transform = `rotate(${cap(position, p.ll) - orientation}deg)`;
+    }
+  }
+
+  function parler(txt) {
+    if (!etat.voix || !("speechSynthesis" in window)) return;
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(txt); u.lang = "fr-FR"; speechSynthesis.speak(u);
+  }
+  function toast(txt) { const t = $("toast"); t.textContent = txt; t.style.display = "block";
+    clearTimeout(toast.h); toast.h = setTimeout(() => (t.style.display = "none"), 4000); }
+
+  function avancer(delta) {
+    const k = etat.iti, n = pts[k].length;
+    let i = etat.idx[k] + delta;
+    if (i >= n) {
+      if (k === 0) { // fin du principal -> on enchaîne sur les secondaires
+        etat.iti = 1; toast("Voies prioritaires terminées. Place aux voies secondaires.");
+        parler("Voies prioritaires terminées. Début des voies secondaires.");
+      } else { toast("Circuit terminé."); parler("Circuit terminé."); i = n - 1; }
+    } else if (i < 0) i = 0;
+    if (etat.iti === k) etat.idx[k] = i;
+    sauver(); rafraichir();
+    const p = cible();
+    if (delta > 0) parler(`${p.num !== null ? "Point " + p.num + ". " : ""}${p.nom}`);
+    if (suivre) map.panTo(p.ll);
+  }
+
+  // ---------- GPS ----------
+  let watch = null, wake = null;
+  async function demarrer() {
+    if (!("geolocation" in navigator)) { toast("GPS indisponible sur cet appareil."); return; }
+    if (watch !== null) { navigator.geolocation.clearWatch(watch); watch = null;
+      $("bStart").textContent = "Démarrer"; $("etat").textContent = "GPS arrêté"; if (wake) wake.release(); return; }
+    try { wake = await navigator.wakeLock?.request("screen"); } catch (e) {}
+    $("bStart").textContent = "Arrêter"; $("etat").textContent = "recherche du GPS…";
+    watch = navigator.geolocation.watchPosition((g) => {
+      position = [g.coords.latitude, g.coords.longitude];
+      if (g.coords.heading != null && !isNaN(g.coords.heading)) orientation = g.coords.heading;
+      $("etat").textContent = `GPS ±${Math.round(g.coords.accuracy)} m`;
+      if (!posMarker) { posMarker = L.circleMarker(position, { radius: 9, color: "#fff", weight: 3, fillColor: "#2a7bff", fillOpacity: 1 }).addTo(map);
+        precision = L.circle(position, { radius: g.coords.accuracy, weight: 1, color: "#2a7bff", fillOpacity: 0.1 }).addTo(map); }
+      posMarker.setLatLng(position); precision.setLatLng(position).setRadius(g.coords.accuracy);
+      if (suivre) map.panTo(position, { animate: true });
+      if (distance(position, cible().ll) < RAYON_ARRIVEE) avancer(1); else majGuide();
+    }, (err) => { $("etat").textContent = "GPS refusé ou indisponible"; toast("Autorise la localisation pour ce site."); },
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 20000 });
+  }
+  window.addEventListener("deviceorientationabsolute", (e) => { if (e.alpha != null && !position) orientation = 360 - e.alpha; });
+
+  // ---------- routes OSRM (aligner le tracé sur les rues) ----------
+  async function aligner() {
+    for (let k = 0; k < 2; k++) {
+      const coords = pts[k].map((p) => p.ll[1].toFixed(6) + "," + p.ll[0].toFixed(6)).join(";");
+      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&continue_straight=false`;
+      try {
+        const r = await (await fetch(url)).json();
+        etat["geo" + k] = r.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
+      } catch (e) { toast("Calcul des routes impossible (hors-ligne ?). Tracé en lignes droites."); return; }
+    }
+    etat.snap = true; sauver(); dessinerTraces(); toast("Tracés alignés sur les rues (OpenStreetMap / OSRM).");
+  }
+
+  // ---------- boutons ----------
+  $("bStart").onclick = demarrer;
+  $("bPrec").onclick = () => avancer(-1);
+  $("bSuiv").onclick = () => avancer(1);
+  $("bSuivi").onclick = (e) => { suivre = !suivre; e.target.classList.toggle("on", suivre); if (suivre) map.panTo((position || cible().ll)); };
+  $("bVoix").onclick = (e) => { etat.voix = !etat.voix; e.target.classList.toggle("on", etat.voix); sauver();
+    if (etat.voix) parler("Guidage vocal activé"); };
+  $("bRoute").onclick = aligner;
+  $("bIti").onclick = () => { etat.iti = etat.iti === 0 ? 1 : 0; sauver(); rafraichir(); map.panTo(cible().ll); };
+  $("bEdit").onclick = (e) => { editMode = !editMode; e.target.classList.toggle("on", editMode);
+    toast(editMode ? "Mode édition : glisse un point, touche-le pour renommer la rue." : "Édition terminée.");
+    dessinerMarqueurs(); };
+  $("bExport").onclick = () => {
+    const out = ITINERAIRES.map((it, k) => ({ id: it.id, titre: it.titre,
+      points: pts[k].map((p) => ({ numero: p.num, rue: p.nom, lat: +p.ll[0].toFixed(6), lon: +p.ll[1].toFixed(6) })) }));
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([JSON.stringify(out, null, 2)], { type: "application/json" }));
+    a.download = "itineraire3-salage.json"; a.click();
+  };
+  $("bReset").onclick = () => { if (confirm("Effacer les corrections et la progression ?")) { localStorage.removeItem(CLE); location.reload(); } };
+  $("bVoix").classList.toggle("on", etat.voix);
+  $("bSuivi").classList.toggle("on", suivre);
+
+  rafraichir();
+  map.fitBounds(L.latLngBounds(pts.flat().map((p) => p.ll)), { padding: [20, 20] });
+  if (etat.snap) dessinerTraces();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
