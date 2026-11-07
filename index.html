@@ -237,47 +237,69 @@
   window.addEventListener("deviceorientationabsolute", (e) => { if (e.alpha != null && !position) orientation = 360 - e.alpha; });
 
   // ---------- alignement sur les rues (OSRM) ----------
-  // Chaque point est ramené sur la rue la plus proche (rayon 300 m), puis le tracé suit les routes entre les points.
+  // Chaque point est ramené sur la rue la plus proche, puis le tracé suit les routes entre les points.
+  // Si un point est trop loin de toute route, on élargit son rayon de recherche, puis on l'ignore.
   let enCours = false;
+  async function routeOsrm(base) {
+    const radii = base.map(() => 300), use = base.map((_, i) => i);
+    for (let essai = 0; essai < 25 && use.length > 1; essai++) {
+      const coords = use.map((i) => base[i][1].toFixed(6) + "," + base[i][0].toFixed(6)).join(";");
+      const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&continue_straight=false&radiuses=${use.map((i) => radii[i]).join(";")}`;
+      const rep = await fetch(url);
+      const r = await rep.json().catch(() => ({}));
+      if (r.code === "Ok" && r.routes && r.routes[0]) return { r, use };
+      if (r.code === "NoSegment") {
+        const m = /(\d+)/.exec(r.message || ""); const j = m ? +m[1] : -1;
+        if (j >= 0 && j < use.length) { const i = use[j];
+          if (radii[i] < 3000) radii[i] *= 4; else use.splice(j, 1); continue; }
+      }
+      throw new Error(r.message || r.code || ("HTTP " + rep.status));
+    }
+    throw new Error("aucun tracé possible");
+  }
   async function aligner(silencieux) {
     if (enCours) return; enCours = true;
     if (silencieux !== true) toast("Alignement sur les rues…", 8000);
     try {
       for (let k = 0; k < 2; k++) {
         const base = ITINERAIRES[k].points.map((p, i) => { const e = etat.edits[k + ":" + i]; return e && e.ll ? e.ll : brut(p); });
-        const coords = base.map((c) => c[1].toFixed(6) + "," + c[0].toFixed(6)).join(";");
-        const rad = base.map(() => 300).join(";");
-        const url = `https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson&continue_straight=false&radiuses=${rad}`;
-        const r = await (await fetch(url)).json();
-        if (!r.routes || !r.routes[0]) throw new Error(r.message || r.code);
+        const { r, use } = await routeOsrm(base);
         etat.geo[k] = r.routes[0].geometry.coordinates.map((c) => [c[1], c[0]]);
-        etat.sn[k] = r.waypoints.map((w) => [w.location[1], w.location[0]]);
-        etat.nm[k] = r.waypoints.map((w) => w.name || "");
+        etat.sn[k] = base.map(() => null); etat.nm[k] = base.map(() => "");
+        r.waypoints.forEach((w, j) => { etat.sn[k][use[j]] = [w.location[1], w.location[0]]; etat.nm[k][use[j]] = w.name || ""; });
       }
       sauver(); construire(); rafraichir();
       toast("Points et tracés alignés sur les rues (OpenStreetMap).");
-    } catch (e) { if (silencieux !== true) toast("Alignement impossible (hors-ligne ? réessaie avec du réseau)."); }
+    } catch (e) { toast("Alignement impossible : " + (e.message || e) + ". Vérifie le réseau puis appuie sur « Routes ».", 7000); }
     enCours = false;
   }
 
-  // ---------- calage en 2 touches ----------
-  const REF = [[0, 0], [0, 6]]; // [itinéraire, index] : début du circuit, rond-point des États-Unis
+  // ---------- calage en 3 touches (décalage + rotation + échelle, moindres carrés) ----------
+  const REF = [[0, 0], [0, 5], [0, 17]]; // début du circuit · rond-point des États-Unis · pont vers Pasly
+  const QUOI = ["le point n°1 : début du circuit, sur l'avenue de Coucy",
+                "le rond-point des États-Unis (point n°6)",
+                "le pont sur l'Aisne vers Pasly (point n°12)"];
   function calerDebut() {
     calageEtape = 1; calageClics = [];
-    toast("Touche sur la carte l'endroit exact du point n°1 : début du circuit, avenue de Coucy.", 9000);
+    toast("Calage 1/3 : touche sur la carte " + QUOI[0] + ".", 12000);
   }
   map.on("click", (ev) => {
     if (!calageEtape) return;
     calageClics.push([ev.latlng.lat, ev.latlng.lng]);
-    if (calageEtape === 1) { calageEtape = 2;
-      toast("Maintenant touche l'endroit du point n°6 : le rond-point des États-Unis.", 9000); return; }
+    if (calageEtape < 3) { calageEtape++;
+      toast(`Calage ${calageEtape}/3 : touche ${QUOI[calageEtape - 1]}.`, 12000); return; }
     calageEtape = 0;
     const z = REF.map(([k, i]) => { const p = ITINERAIRES[k].points[i]; return pxVersM(p[1], p[2]); });
-    const w = calageClics.map(gpsVersM);
-    const dz = [z[1][0] - z[0][0], z[1][1] - z[0][1]], dw = [w[1][0] - w[0][0], w[1][1] - w[0][1]];
-    const den = dz[0] ** 2 + dz[1] ** 2;
-    const a = [(dw[0] * dz[0] + dw[1] * dz[1]) / den, (dw[1] * dz[0] - dw[0] * dz[1]) / den];
-    const b = [w[0][0] - (a[0] * z[0][0] - a[1] * z[0][1]), w[0][1] - (a[0] * z[0][1] + a[1] * z[0][0])];
+    const w = calageClics.map(gpsVersM), n = z.length;
+    const mz = [z.reduce((t, v) => t + v[0], 0) / n, z.reduce((t, v) => t + v[1], 0) / n];
+    const mw = [w.reduce((t, v) => t + v[0], 0) / n, w.reduce((t, v) => t + v[1], 0) / n];
+    let num = [0, 0], den = 0;
+    for (let i = 0; i < n; i++) {
+      const dz = [z[i][0] - mz[0], z[i][1] - mz[1]], dw = [w[i][0] - mw[0], w[i][1] - mw[1]];
+      num[0] += dz[0] * dw[0] + dz[1] * dw[1]; num[1] += dz[0] * dw[1] - dz[1] * dw[0]; den += dz[0] ** 2 + dz[1] ** 2;
+    }
+    const a = [num[0] / den, num[1] / den];
+    const b = [mw[0] - (a[0] * mz[0] - a[1] * mz[1]), mw[1] - (a[0] * mz[1] + a[1] * mz[0])];
     etat.calage = { a, b }; etat.edits = {}; etat.sn = [null, null]; etat.nm = [null, null]; etat.geo = [null, null];
     sauver(); construire(); rafraichir();
     map.fitBounds(L.latLngBounds(pts.flat().map((p) => p.ll)), { padding: [20, 20] });
@@ -310,7 +332,8 @@
 
   rafraichir();
   map.fitBounds(L.latLngBounds(pts.flat().map((p) => p.ll)), { padding: [20, 20] });
-  if (!etat.geo[0] || !etat.geo[1]) aligner(true);   // alignement automatique au premier lancement
+  if (!etat.calage) toast("Première utilisation : appuie sur « Caler » et touche 3 repères sur la carte pour recaler le circuit.", 15000);
+  else if (!etat.geo[0] || !etat.geo[1]) aligner();
   if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
 })();
 </script>

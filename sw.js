@@ -1,5 +1,5 @@
 // Service worker : l'app marche hors-ligne, et les tuiles de carte déjà vues sont gardées.
-const APP = "gps-salage-app-v2", TUILES = "gps-salage-tuiles-v1";
+const APP = "gps-salage-app-v3", TUILES = "gps-salage-tuiles-v1";
 const FICHIERS = ["./", "index.html", "data.js", "manifest.webmanifest", "icon.svg",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"];
 

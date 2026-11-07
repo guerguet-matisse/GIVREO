@@ -61,7 +61,7 @@ Puis ouvre <http://localhost:8000>.
 | **◀ Précédent · Suivant ▶** | change de point à la main (toucher un numéro sur la carte marche aussi) |
 | **Suivre** | la carte reste centrée sur ta position |
 | **Voix** | active l'annonce vocale |
-| **Caler** | tu touches sur la carte le point n°1 puis le point n°6 : tout le circuit se recale (rotation + échelle), puis s'aligne sur les rues |
+| **Caler** | à faire en premier : tu touches sur la carte 3 repères (début du circuit, rond-point des États-Unis, pont vers Pasly). Le circuit se recale (décalage, rotation, échelle) puis s'aligne sur les rues |
 | **Routes** | relance l'alignement des points et des tracés sur les vraies rues (internet requis, fait automatiquement au 1er lancement) |
 | **Voies secondaires / prioritaires** | bascule d'un itinéraire à l'autre |
 | **Éditer** | glisser un point = le déplacer · le toucher = renommer la rue |
