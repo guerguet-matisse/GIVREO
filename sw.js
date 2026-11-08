@@ -1,7 +1,7 @@
 // © 2026 Matisse Guerguet – Tous droits réservés. Voir le fichier LICENSE.
 // Service worker : démarrage instantané, mode hors-ligne, tuiles de carte conservées (plafonnées).
-const APP = "givreo-app-v1", TUILES = "gps-salage-tuiles-v1", MAX_TUILES = 1200; // la zone téléchargée est dans le cache "gps-salage-zone" (jamais purgé ici)
-const FICHIERS = ["./", "index.html", "style.css", "app.js", "lib.js", "data.js", "manifest.webmanifest", "icon.svg",
+const APP = "givreo-app-v2", TUILES = "gps-salage-tuiles-v1", MAX_TUILES = 1200; // la zone téléchargée est dans le cache "gps-salage-zone" (jamais purgé ici)
+const FICHIERS = ["./", "index.html", "style.css", "app.js", "lib.js", "data.js", "manifest.webmanifest", "icon-192.png", "apple-touch-icon.png", "favicon-32.png", "favicon-48.png",
   "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js", "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"];
 
 self.addEventListener("install", (e) => e.waitUntil(

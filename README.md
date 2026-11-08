@@ -1,6 +1,8 @@
 <div align="center">
 
-# ❄️ Givréo
+<img src="icon-512.png" alt="Logo Givréo" width="128">
+
+# Givréo
 
 **Le guidage GPS du salage hivernal – Itinéraire n°3 (Soissons)**
 
@@ -211,7 +213,7 @@ GIVREO/
 ├── data.js               points des deux itinéraires + calage GPS
 ├── sw.js                 service worker (hors-ligne, zone téléchargée, tuiles plafonnées à 1 200)
 ├── manifest.webmanifest  installation sur téléphone
-├── icon.svg              icône
+├── icon-192.png, icon-512.png, icon-maskable-512.png, apple-touch-icon.png, favicon-*.png   icônes
 └── LICENSE               licence propriétaire
 ```
 
