@@ -5,11 +5,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#0b1620">
-<meta name="description" content="Guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)">
+<meta name="description" content="Givréo : guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg">
 <link rel="apple-touch-icon" href="icon.svg">
-<title>GPS Salage – Itinéraire 3</title>
+<title>Givréo – Guidage de salage</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -27,7 +27,7 @@
     </div>
   </header>
   <div id="stats">
-    <span id="sKm"></span><span id="sFin"></span><span id="sEtat">GPS arrêté</span><span id="sMeteo"></span>
+    <span id="sKm"></span><span id="sFin"></span><span id="sEtat">GPS arrêté</span><span id="sSel"></span><span id="sMeteo"></span>
   </div>
   <div id="barre" role="progressbar" aria-label="Avancement de la tournée" aria-valuemin="0" aria-valuemax="100"><i id="barreI"></i></div>
 
@@ -37,8 +37,15 @@
   <div id="flottants">
     <button id="bSuivi" class="rond on" aria-label="Centrer sur ma position" aria-pressed="true">
       <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.5"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg></button>
+    <button id="bIncident" class="rond alerte-btn" aria-label="Signaler un incident">
+      <svg viewBox="0 0 24 24"><path d="M12 3 2.5 20h19z"/><path d="M12 10v4M12 17.2v.1"/></svg></button>
     <button id="bNuit" class="rond" aria-label="Basculer jour / nuit">
       <svg viewBox="0 0 24 24"><path d="M20 14.5A8 8 0 1 1 9.5 4 6.5 6.5 0 0 0 20 14.5z"/></svg></button>
+  </div>
+
+  <div id="rejeu" hidden>
+    <button id="rjPlay" aria-label="Pause / lecture">⏸</button><button id="rjVit" aria-label="Vitesse du rejeu">×30</button>
+    <span id="rjT">--:--</span><button id="rjFerme" aria-label="Fermer le rejeu">✕</button>
   </div>
 
   <section id="feuille" hidden>
@@ -57,6 +64,7 @@
           <button id="bRec">Enregistrer ma trace</button>
           <button id="bEffTrace">Effacer ma trace</button>
           <button id="bEdit">Éditer les points</button>
+          <button id="bDebloq">Débloquer les voies</button>
           <button id="bImport">Importer GPX / JSON</button>
           <button id="bGpx">Exporter GPX</button>
           <button id="bJson">Exporter JSON</button>
@@ -64,17 +72,56 @@
         <input type="file" id="fichier" accept=".gpx,.json,application/gpx+xml,application/json" hidden>
       </div>
 
+      <div id="p-sel" class="panneau" hidden>
+        <div id="selConseil" class="carte"></div>
+        <div class="champ"><span>Dose de sel (g/m²)</span>
+          <div class="duo"><input id="sDose" type="number" min="0" max="60" step="1" inputmode="decimal"><button id="sDoseAuto" type="button" class="mini">Dose conseillée</button></div></div>
+        <label class="champ">Largeur salée (m)<input id="sLarg" type="number" min="1" max="15" step="0.5" inputmode="decimal"></label>
+        <label class="champ">Sel dans le camion au départ (kg)<input id="sStock" type="number" min="0" step="50" inputmode="decimal"></label>
+        <button id="sSaleuse" class="gros" type="button">Saleuse : désactivée</button>
+        <div id="selBilan" class="carte" style="margin-top:.8rem"></div>
+      </div>
+
+      <div id="p-incident" class="panneau" hidden>
+        <button id="iBloque" class="gros rouge" type="button">Voie impraticable : sauter ce point</button>
+        <h3>Signaler un incident</h3>
+        <div class="outils" id="iTypes"></div>
+        <label class="champ">Note<textarea id="iNote" rows="2" placeholder="Précision (facultatif)"></textarea></label>
+        <label class="champ">Photo (facultatif)<input id="iPhoto" type="file" accept="image/*" capture="environment"></label>
+        <button id="iSave" class="gros" type="button">Enregistrer l'incident</button>
+      </div>
+
+      <div id="p-checklist" class="panneau" hidden>
+        <p class="mentions" style="margin-top:0">Coche chaque point avant de partir.</p>
+        <div id="clListe" class="liste"></div>
+        <div class="outils" style="margin-top:.6rem"><button id="clAjout" type="button">Ajouter un élément</button><button id="clPasser" type="button">Passer</button></div>
+        <button id="clGo" class="gros" type="button" style="margin-top:.8rem">Démarrer la tournée</button>
+      </div>
+
       <div id="p-journal" class="panneau" hidden>
         <div id="jCourant" class="carte"></div>
         <label class="champ">Sel utilisé (kg)<input id="jSel" type="number" inputmode="decimal" min="0" step="10"></label>
-        <label class="champ">Notes<textarea id="jNotes" rows="3" placeholder="Incident, état de la route, remarque…"></textarea></label>
-        <div class="outils">
-          <button id="jFin">Terminer la tournée</button>
-          <button id="jCsv">Exporter CSV</button>
-          <button id="jPdf">Imprimer / PDF</button>
-        </div>
+        <label class="champ">Notes<textarea id="jNotes" rows="2" placeholder="Remarque, état de la route…"></textarea></label>
+        <button id="jFin" class="gros" type="button">Terminer la tournée</button>
+
         <h3>Historique</h3>
         <div id="jListe" class="liste"></div>
+        <div id="jDetail" class="carte" style="margin-top:.6rem"></div>
+        <div class="outils">
+          <button id="jRejeu" type="button">Rejouer sur la carte</button>
+          <button id="jSuppr" type="button">Supprimer</button>
+          <button id="jShare" type="button">Partager le bilan</button>
+          <button id="jSms" type="button">Bilan par SMS</button>
+          <button id="jWa" type="button">Bilan WhatsApp</button>
+          <button id="jCsv" type="button">Exporter CSV</button>
+          <button id="jPdf" type="button">Imprimer / PDF</button>
+        </div>
+
+        <h3>Incidents</h3>
+        <div id="jInc" class="liste"></div>
+
+        <h3>Statistiques</h3>
+        <div id="jStats"></div>
       </div>
 
       <div id="p-reglages" class="panneau" hidden>
@@ -83,10 +130,14 @@
         <div class="champ"><span>Taille du texte</span>
           <div class="seg" id="segTaille"><button data-v="1">Normal</button><button data-v="1.15">Grand</button><button data-v="1.3">Très grand</button></div></div>
         <label class="ligne"><span>Guidage vocal</span><input type="checkbox" id="rVoix"></label>
+        <label class="ligne"><span>Check-list avant chaque départ</span><input type="checkbox" id="rCheck"></label>
         <label class="champ"><span>Distance de validation d'un point : <b id="rRayonV"></b></span><input type="range" id="rRayon" min="20" max="80" step="5"></label>
         <label class="champ">Vitesse moyenne pour l'heure de fin (km/h)<input type="number" id="rVitesse" min="5" max="60" inputmode="numeric"></label>
+        <h3>Carte hors-ligne</h3>
+        <div id="zoneCarte" class="carte"></div>
+        <div class="outils"><button id="zDl" type="button">Télécharger la zone</button><button id="zSup" type="button">Supprimer</button></div>
         <button id="rReset" class="danger">Tout réinitialiser</button>
-        <p class="mentions">© 2026 Matisse Guerguet – Tous droits réservés.<br>Cartes © contributeurs d'OpenStreetMap · itinéraires OSRM · météo Open-Meteo. Le risque de verglas est indicatif et ne remplace pas la vigilance Météo-France.</p>
+        <p class="mentions"><b>Givréo</b> · © 2026 Matisse Guerguet – Tous droits réservés.<br>Cartes © contributeurs d'OpenStreetMap · itinéraires OSRM · météo Open-Meteo. Le risque de verglas est indicatif et ne remplace pas la vigilance Météo-France.</p>
       </div>
     </div>
   </section>
@@ -99,6 +150,7 @@
     </div>
     <nav id="onglets">
       <button data-p="tournee">Tournée</button>
+      <button data-p="sel">Sel</button>
       <button data-p="journal">Journal</button>
       <button data-p="reglages">Réglages</button>
     </nav>

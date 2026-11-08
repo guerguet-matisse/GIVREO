@@ -72,8 +72,8 @@ button { cursor: pointer; }
 #commandes button { min-height: 3.4rem; border-radius: 14px; border: 1px solid var(--ligne); background: var(--surf2); font-weight: 800; font-size: 1.2rem; }
 #bStart { background: var(--ambre); color: var(--ambre-txt); border-color: var(--ambre); font-size: 1.15rem; }
 #bStart.actif { background: var(--surf2); color: var(--texte); border-color: var(--ambre); }
-#onglets { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin-top: .5rem; }
-#onglets button { min-height: 2.6rem; border-radius: 10px; border: 0; background: transparent; color: var(--doux); font-weight: 700; }
+#onglets { display: grid; grid-template-columns: repeat(4, 1fr); gap: .4rem; margin-top: .5rem; }
+#onglets button { min-height: 2.6rem; border-radius: 10px; border: 0; background: transparent; color: var(--doux); font-weight: 700; font-size: .9rem; padding: 0 .2rem; }
 #onglets button.on { background: var(--surf2); color: var(--texte); box-shadow: inset 0 -3px 0 var(--ambre); }
 
 /* ---------- feuille (panneaux) ---------- */
@@ -108,6 +108,37 @@ button.danger { width: 100%; color: var(--danger); margin-top: 1rem; }
 .mentions { font-size: .75rem; color: var(--doux); margin-top: 1.2rem; }
 #impression { display: none; }
 
+
+.rond.alerte-btn { background: var(--danger); color: #fff; border-color: var(--danger); }
+.duo { display: grid; grid-template-columns: 1fr auto; gap: .5rem; }
+.mini { min-height: 2.8rem; padding: 0 .8rem; border-radius: 10px; border: 1px solid var(--ligne); background: var(--surf2); font-weight: 700; }
+.gros { width: 100%; min-height: 3.3rem; border-radius: 12px; border: 0; background: var(--ambre); color: var(--ambre-txt); font-weight: 800; font-size: 1.05rem; }
+.gros.rouge { background: var(--danger); color: #fff; }
+.gros.on { background: var(--ok); color: #04210f; }
+.gros:disabled, .outils button:disabled { opacity: .45; }
+.pt.bloque { background: #555 !important; opacity: .55; border-style: dashed; }
+.liste .bloque { text-decoration: line-through; opacity: .55; }
+.liste button.cur, .liste .ligneinc { border-radius: 10px; }
+.ligneinc { display: grid; grid-template-columns: 1fr auto; gap: .5rem; align-items: center; padding: .4rem .6rem; background: var(--surf2); }
+.ligneinc button { border: 0; background: transparent; color: var(--doux); min-height: 2.4rem; min-width: 2.4rem; font-weight: 700; }
+.coche { min-height: 2.8rem; cursor: pointer; display: grid; grid-template-columns: 1.6rem 1fr auto; gap: .6rem; align-items: center; padding: .25rem .4rem; border-radius: 10px; background: var(--surf2); }
+.coche .box { width: 1.5rem; height: 1.5rem; border: 2px solid var(--doux); border-radius: 6px; display: grid; place-items: center; font-weight: 800; }
+.coche.ok .box { background: var(--ok); border-color: var(--ok); color: #04210f; }
+.coche > button:first-child { all: unset; display: contents; }
+.coche .x { border: 0; background: transparent; color: var(--doux); min-width: 2.2rem; min-height: 2.2rem; }
+.liste .choisie { border-color: var(--ambre); background: var(--surf2); }
+.stat { padding: .6rem .8rem; border-radius: 12px; background: var(--surf2); margin-bottom: .5rem; line-height: 1.4; font-size: .92rem; }
+.stat b { font-size: 1rem; }
+.barres { display: grid; gap: .35rem; margin-top: .3rem; }
+.barres div { display: grid; grid-template-columns: 4.4rem 1fr; gap: .5rem; align-items: center; font-size: .82rem; color: var(--doux); }
+.barres i { display: block; height: 1.1rem; border-radius: 4px; background: var(--ambre); min-width: 2px; }
+.barres span { display: flex; gap: .5rem; align-items: center; }
+#rejeu { position: absolute; left: 50%; bottom: calc(var(--dockh) + .6rem); transform: translateX(-50%); z-index: 880; display: flex; gap: .5rem;
+  align-items: center; padding: .4rem .6rem; border-radius: 999px; background: var(--surf); border: 1px solid var(--ligne); box-shadow: 0 6px 18px #0007; }
+#rejeu[hidden] { display: none; }
+#rejeu button { min-width: 2.8rem; min-height: 2.8rem; border-radius: 999px; border: 0; background: var(--surf2); font-weight: 800; }
+#rejeu span { min-width: 3.2rem; text-align: center; font-weight: 800; }
+.chip-rouge { color: var(--danger); font-weight: 800; }
 @media (prefers-reduced-motion: reduce) { #fleche, #barre i { transition: none; } }
 @media (max-width: 360px) { #rue { font-size: 1.3rem; } #nav { min-width: 3.6rem; } }
 @media print {

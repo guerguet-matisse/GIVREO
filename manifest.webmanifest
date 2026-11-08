@@ -1,6 +1,6 @@
 {
-  "name": "GPS Salage – Itinéraire 3",
-  "short_name": "GPS Salage",
+  "name": "Givréo – Guidage de salage",
+  "short_name": "Givréo",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
@@ -20,6 +20,6 @@
     "navigation",
     "utilities"
   ],
-  "description": "Guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)",
+  "description": "Givréo : guidage GPS du circuit de salage – Itinéraire n°3 (Soissons)",
   "id": "./"
 }

@@ -11,12 +11,14 @@
   // État (sauvegardé dans le téléphone, écriture différée pour rester fluide)
   // =====================================================================================
   const defaut = () => ({ tournee: "n3", part: 0, idx: {}, edits: {}, sn: {}, nm: {}, geo: {}, traces: {}, calage: null,
-    imports: [], journal: [], session: null, meteo: null,
-    reg: { theme: "auto", echelle: 1, voix: false, rayon: 35, vitesse: 25 } });
+    imports: [], journal: [], session: null, meteo: null, incidents: [], bloques: {}, cl: {}, zone: null,
+    checklist: ["Lame fixée et vérifiée", "Saleuse chargée et réglée", "Quantité de sel notée", "Gyrophare et feux de travail", "Carburant suffisant", "Téléphone chargé"],
+    sel: { dose: 20, largeur: 6, stock: "", saleuse: false, manuel: false },
+    reg: { theme: "auto", echelle: 1, voix: false, rayon: 35, vitesse: 25, checklist: true } });
   let etat = defaut();
   try {
     const s = JSON.parse(localStorage.getItem(CLE) || "null");
-    if (s) etat = Object.assign(defaut(), s, { reg: Object.assign(defaut().reg, s.reg || {}) });
+    if (s) etat = Object.assign(defaut(), s, { reg: Object.assign(defaut().reg, s.reg || {}), sel: Object.assign(defaut().sel, s.sel || {}) });
     else { const v2 = JSON.parse(localStorage.getItem("gps-salage-v2") || "null"); if (v2 && v2.calage) etat.calage = v2.calage; }
   } catch (e) { /* stockage indisponible : on continue avec l'état par défaut */ }
   let tSave;
@@ -101,7 +103,7 @@
   function classePt(id, i) {
     const t = tourneeCourante(), p = pts[id][i], k = t.parts.indexOf(id);
     const fait = k < etat.part || (k === etat.part && i < idxCur());
-    return ["pt", p.num === null ? "via" : "", fait ? "fait" : "", id === partId() && i === idxCur() ? "cible" : ""].join(" ").replace(/\s+/g, " ").trim();
+    return ["pt", p.num === null ? "via" : "", fait ? "fait" : "", id === partId() && i === idxCur() ? "cible" : "", etat.bloques[id + ":" + i] ? "bloque" : ""].join(" ").replace(/\s+/g, " ").trim();
   }
   function iconePt(id, i, cls) {
     const via = pts[id][i].num === null;
@@ -162,6 +164,7 @@
     $("sKm").innerHTML = `<b>${G.fmtDist(reste)}</b> restants`;
     $("sFin").innerHTML = reste > 30 ? `fin vers <b>${G.fmtHeure(Date.now() + (reste / v) * 1000)}</b>` : "<b>terminé</b>";
     $("barreI").style.width = pct + "%"; $("barre").setAttribute("aria-valuenow", pct);
+    resteM = reste; majSelChip();
   }
   function majTout() { majIcones(); dessinerTraces(); majGuide(); majStats(); if (panneau === "tournee") { majListe(); majSegParts(); } }
 
@@ -177,10 +180,11 @@
     clearTimeout(banniere.h); if (ms) banniere.h = setTimeout(() => (a.style.display = "none"), ms); }
 
   function aller(id, i) { termine = false; etat.part = tourneeCourante().parts.indexOf(id); etat.idx[id] = i; sauver(); majTout(); map.panTo(cible().ll); }
-  function avancer(delta) { // renvoie false quand le circuit est terminé
+  const bloque = (id, i) => !!etat.bloques[id + ":" + i];
+  function avancer(delta, sauter, prof = 0) { // renvoie false quand le circuit est terminé
     const t = tourneeCourante(); let id = partId(), i = idxCur() + delta, ok = true;
     if (delta < 0) termine = false;
-    if (delta > 0 && watch !== null && !termine) noterPassage(id, idxCur());
+    if (delta > 0 && watch !== null && !termine && !sauter) noterPassage(id, idxCur());
     if (i >= pts[id].length) {
       if (etat.part < t.parts.length - 1) { etat.part++; id = partId(); i = 0;
         const m = `${infoPart(t.parts[etat.part - 1]).titre} terminées. Place à : ${infoPart(id).titre}.`; toast(m); parler(m); }
@@ -188,7 +192,9 @@
     } else if (i < 0) {
       if (etat.part > 0) { etat.part--; id = partId(); i = pts[id].length - 1; } else i = 0;
     }
-    etat.idx[id] = i; sauver(); majTout();
+    etat.idx[id] = i; sauver();
+    if (ok && prof < 80 && bloque(id, i) && !(delta < 0 && etat.part === 0 && i === 0)) return avancer(delta > 0 ? 1 : -1, true, prof + 1);
+    majTout();
     const p = cible(); if (delta > 0 && ok) parler((p.num !== null ? "Point " + p.num + ". " : "") + p.nom);
     if (suivre && !position) map.panTo(p.ll);
     return ok;
@@ -197,7 +203,7 @@
   // =====================================================================================
   // GPS : position, validation des points, alertes d'approche, trace, kilomètres
   // =====================================================================================
-  let watch = null, wake = null, lastFix = null, lastCalc = 0, lastPan = 0;
+  let watch = null, wake = null, lastFix = null, lastCalc = 0, lastPan = 0, lastFixT = 0, lastSauve = 0, resteM = 0;
   const annonces = new Set(), enreg = { on: false, pts: [], part: null };
   async function verrouEcran() { try { wake = await navigator.wakeLock?.request("screen"); } catch (e) { /* non supporté */ } }
 
@@ -222,11 +228,18 @@
     position = [c.latitude, c.longitude];
     if (c.heading != null && !isNaN(c.heading) && (c.speed || 0) > 1) orientation = c.heading;
     txt($("sEtat"), `GPS ±${Math.round(c.accuracy)} m`);
+    lastFixT = now;
     if (c.accuracy < 40) {
       if (lastFix) { const d = G.haversine(lastFix, position);
-        if (d > 3 && d < 500) { const s = sessionCourante(false); if (s) s.km += d / 1000; lastFix = position; } }
+        if (d > 3 && d < 500) { const s = sessionCourante(false);
+          if (s) { s.km += d / 1000;
+            if (etat.sel.saleuse) s.selAuto = (s.selAuto || 0) + (d / 1000) * etat.sel.largeur * etat.sel.dose;
+            const lt = s.pts[s.pts.length - 1];
+            if ((!lt || G.haversine(lt, position) >= 10) && s.pts.length < 6000) s.pts.push([+position[0].toFixed(5), +position[1].toFixed(5), now]); }
+          lastFix = position; } }
       else lastFix = position;
     }
+    if (now - lastSauve > 15000) { lastSauve = now; sauver(); }
     if (enreg.on && c.accuracy < 35) { const l = enreg.pts[enreg.pts.length - 1];
       if (!l || G.haversine(l, position) >= 5) { enreg.pts.push(position); if (enreg.pts.length % 10 === 0) majBoutons(); } }
     if (!posMarker) {
@@ -399,9 +412,10 @@
   // =====================================================================================
   function sessionCourante(creer) {
     let s = etat.journal.find((j) => j.id === etat.session);
+    if (s) { s.pts = s.pts || []; s.selAuto = s.selAuto || 0; }
     if (s && Date.now() - s.debut > 12 * 3600e3) { s.fin = s.fin || Date.now(); etat.session = null; s = null; }
     if (!s && creer) {
-      s = { id: "s" + Date.now(), debut: Date.now(), fin: null, tournee: tourneeCourante().titre, passages: [], selKg: "", notes: "",
+      s = { id: "s" + Date.now(), debut: Date.now(), fin: null, tournee: tourneeCourante().titre, passages: [], selKg: "", notes: "", selAuto: 0, pts: [],
         km: 0, meteo: etat.meteo && etat.meteo.risk ? `${etat.meteo.temp != null ? etat.meteo.temp + "°C, " : ""}${etat.meteo.risk.libelle}` : "" };
       etat.journal.unshift(s); etat.journal = etat.journal.slice(0, 60); etat.session = s.id; sauver(); majJournal();
     }
@@ -413,39 +427,101 @@
   }
   function terminerSession() {
     const s = sessionCourante(false); if (!s) return;
-    s.fin = Date.now(); etat.session = null; sauver(); majJournal();
+    s.fin = Date.now(); etat.session = null;
+    s.pts = G.simplify(s.pts || [], 4); etat.journal.slice(10).forEach((j) => delete j.pts); // on ne garde la trace que des 10 dernières tournées
+    sauver(); majJournal();
   }
+  const esc = (t) => String(t).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
+  let jChoisie = null;
+  const jours = () => etat.journal.find((j) => j.id === jChoisie) || etat.journal[0] || null;
+  const kmTxt = (j) => j.km.toFixed(1).replace(".", ",");
   function majJournal() {
-    const s = sessionCourante(false), cur = $("jCourant");
-    $("jSel").disabled = $("jNotes").disabled = !s;
-    if (s) { cur.innerHTML = `<b>Tournée en cours</b><br>${s.tournee}<br>Départ ${G.fmtHeure(s.debut)} · ${G.fmtDuree((Date.now() - s.debut) / 1000)} · ` +
-        `${s.km.toFixed(1).replace(".", ",")} km · ${s.passages.length} points passés`;
+    const s = sessionCourante(false), cur = $("jCourant"), choisie = jours();
+    $("jSel").disabled = $("jNotes").disabled = $("jFin").disabled = !s;
+    if (s) { cur.innerHTML = `<b>Tournée en cours</b><br>${esc(s.tournee)}<br>Départ ${G.fmtHeure(s.debut)} · ${G.fmtDuree((Date.now() - s.debut) / 1000)} · ` +
+        `${kmTxt(s)} km · ${s.passages.length} points passés` + (s.selAuto ? `<br>Sel estimé (saleuse) : ≈ ${Math.round(s.selAuto)} kg` : "");
       if (document.activeElement !== $("jSel")) $("jSel").value = s.selKg;
       if (document.activeElement !== $("jNotes")) $("jNotes").value = s.notes; }
     else { cur.textContent = "Aucune tournée en cours. Elle démarre quand tu appuies sur « Démarrer »."; $("jSel").value = ""; $("jNotes").value = ""; }
+
     const l = $("jListe"); l.innerHTML = "";
     etat.journal.forEach((j) => { const b = document.createElement("button"); b.type = "button";
+      b.className = choisie && j.id === choisie.id ? "choisie" : "";
       b.innerHTML = `<span class="n" style="background:var(--surf2);color:var(--texte)">${j.passages.length}</span><span>${G.fmtDate(j.debut)} · ${G.fmtHeure(j.debut)}` +
-        `${j.fin ? "–" + G.fmtHeure(j.fin) : " (en cours)"}<br><span class="d">${j.tournee}</span></span><span class="d">${j.km.toFixed(1).replace(".", ",")} km${j.selKg !== "" ? " · " + j.selKg + " kg" : ""}</span>`;
-      l.appendChild(b); });
+        `${j.fin ? "–" + G.fmtHeure(j.fin) : " (en cours)"}<br><span class="d">${esc(j.tournee)}</span></span><span class="d">${kmTxt(j)} km${j.selKg !== "" ? " · " + esc(j.selKg) + " kg" : ""}</span>`;
+      b.onclick = () => { jChoisie = j.id; majJournal(); }; l.appendChild(b); });
     if (!etat.journal.length) l.textContent = "Aucune tournée enregistrée pour l'instant.";
+
+    $("jDetail").innerHTML = choisie ? esc(G.bilanTexte(choisie, etat.incidents.filter((i) => i.session === choisie.id))).replace(/\n/g, "<br>") : "Aucune tournée sélectionnée.";
+    ["jRejeu", "jSuppr", "jShare", "jSms", "jWa"].forEach((id) => ($(id).disabled = !choisie));
+    majIncidentsListe(); majStatsListe(); dessinerIncidents();
   }
+
+  function majIncidentsListe() {
+    const l = $("jInc"); l.innerHTML = "";
+    etat.incidents.slice(0, 30).forEach((inc) => {
+      const d = document.createElement("div"); d.className = "ligneinc";
+      d.innerHTML = '<span></span><button type="button" aria-label="Supprimer l\'incident">✕</button>';
+      d.children[0].textContent = `${G.fmtDate(inc.t)} ${G.fmtHeure(inc.t)} · ${inc.type}${inc.note ? " : " + inc.note : ""}${inc.photo ? " 📷" : ""}${inc.ll ? "" : " (sans position)"}`;
+      d.children[0].onclick = () => { if (inc.photo) voirPhoto(inc); else if (inc.ll) { fermerPanneau(); map.setView(inc.ll, 17); } };
+      d.children[1].onclick = () => { if (!confirm("Supprimer cet incident ?")) return;
+        etat.incidents = etat.incidents.filter((x) => x.id !== inc.id);
+        if (inc.photo) idb("readwrite", (st) => st.delete(inc.photo)).catch(() => {});
+        sauver(); majJournal(); };
+      l.appendChild(d);
+    });
+    if (!etat.incidents.length) l.textContent = "Aucun incident signalé.";
+  }
+  const gInc = L.layerGroup().addTo(map);
+  function dessinerIncidents() { // incidents des dernières 48 h affichés sur la carte
+    gInc.clearLayers();
+    etat.incidents.filter((i) => i.ll && Date.now() - i.t < 48 * 3600e3).forEach((i) =>
+      L.circleMarker(i.ll, { radius: 8, color: "#fff", weight: 2, fillColor: "#ff6b5e", fillOpacity: 1 })
+        .bindTooltip(`${i.type}${i.note ? " : " + i.note : ""}`).addTo(gInc));
+  }
+
+  function majStatsListe() {
+    const st = G.statistiques(etat.journal), el = $("jStats"); el.innerHTML = "";
+    if (!st.parCircuit.length) { el.textContent = "Les statistiques apparaîtront après ta première tournée terminée."; return; }
+    st.parCircuit.forEach((c) => {
+      const d = document.createElement("div"), e = c.derniere.ecart; d.className = "stat";
+      d.innerHTML = `<b></b><br>${c.n} tournée(s) · durée moyenne <b>${G.fmtDuree(c.dureeMoy)}</b> · ${c.kmMoy.toFixed(1).replace(".", ",")} km · sel moyen ${Math.round(c.selMoy)} kg` +
+        `<br>Dernière : ${G.fmtDuree(c.derniere.duree)}` + (e == null ? "" : ` (<b>${e > 0 ? "+" : "−"}${G.fmtDuree(Math.abs(e))}</b> par rapport à la moyenne des précédentes)`);
+      d.firstChild.textContent = c.titre; el.appendChild(d);
+    });
+    const max = Math.max(1, ...st.parMois.map((m) => m.sel)), box = document.createElement("div"), bars = document.createElement("div");
+    box.className = "stat"; box.innerHTML = "<b>Sel par mois</b>"; bars.className = "barres";
+    st.parMois.forEach((m) => { const r = document.createElement("div");
+      r.innerHTML = `<span>${m.mois}</span><span><i style="width:${Math.max(3, (m.sel / max) * 60)}%"></i>${Math.round(m.sel)} kg · ${m.n}</span>`; bars.appendChild(r); });
+    box.appendChild(bars); el.appendChild(box);
+  }
+
+  async function voirPhoto(inc) {
+    try { const blob = await idb("readonly", (st) => st.get(inc.photo));
+      if (blob) window.open(URL.createObjectURL(blob), "_blank"); else toast("Photo introuvable."); } catch (e) { toast("Photo introuvable."); }
+  }
+
   function exporterCsv() {
     const rows = [["Date", "Début", "Fin", "Tournée", "Circuit", "Point", "Rue", "Heure de passage", "Km tournée", "Sel (kg)", "Notes", "Météo"]];
     etat.journal.slice().reverse().forEach((j) => { const base = [G.fmtDate(j.debut), G.fmtHeure(j.debut), j.fin ? G.fmtHeure(j.fin) : "", j.tournee];
-      const fin = [j.km.toFixed(1).replace(".", ","), j.selKg, j.notes, j.meteo];
+      const sel = j.selKg !== "" ? j.selKg : j.selAuto ? Math.round(j.selAuto) : "";
+      const fin = [kmTxt(j), sel, j.notes, j.meteo];
       if (!j.passages.length) rows.push([...base, "", "", "", "", ...fin]);
       j.passages.forEach((p) => rows.push([...base, p.c, p.n == null ? "" : p.n, p.r, G.fmtHeure(p.t), ...fin])); });
+    etat.incidents.slice().reverse().forEach((i) => rows.push([G.fmtDate(i.t), G.fmtHeure(i.t), "", "", "INCIDENT", "",
+      `${i.type}${i.note ? " – " + i.note : ""}${i.ll ? " (" + i.ll[0] + ", " + i.ll[1] + ")" : ""}`, G.fmtHeure(i.t), "", "", "", ""]));
     telecharger("journal-salage.csv", G.toCSV(rows), "text/csv;charset=utf-8");
   }
   function imprimerPdf() {
-    const esc = (s) => String(s).replace(/[<>&]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;" }[c]));
-    let h = "<h1>Journal de tournée de salage</h1><div>Itinéraire n°3 – Soissons</div>";
-    etat.journal.forEach((j) => { h += `<h2 style="margin:14pt 0 0;font-size:12pt">${G.fmtDate(j.debut)} · ${G.fmtHeure(j.debut)}${j.fin ? "–" + G.fmtHeure(j.fin) : ""} · ${esc(j.tournee)}</h2>` +
-      `<div>${j.km.toFixed(1).replace(".", ",")} km · sel : ${j.selKg === "" ? "non renseigné" : esc(j.selKg) + " kg"} · ${j.passages.length} points passés` +
+    let h = "<h1>Givréo – Journal de tournée de salage</h1><div>Itinéraire n°3 – Soissons</div>";
+    etat.journal.forEach((j) => { const sel = j.selKg !== "" ? esc(j.selKg) + " kg" : j.selAuto ? "≈ " + Math.round(j.selAuto) + " kg (estimé)" : "non renseigné";
+      h += `<h2 style="margin:14pt 0 0;font-size:12pt">${G.fmtDate(j.debut)} · ${G.fmtHeure(j.debut)}${j.fin ? "–" + G.fmtHeure(j.fin) : ""} · ${esc(j.tournee)}</h2>` +
+      `<div>${kmTxt(j)} km · sel : ${sel} · ${j.passages.length} points passés` +
       `${j.meteo ? " · météo : " + esc(j.meteo) : ""}${j.notes ? "<br>Notes : " + esc(j.notes) : ""}</div>` +
       (j.passages.length ? "<table><tr><th>Heure</th><th>Circuit</th><th>Point</th><th>Rue</th></tr>" + j.passages.map((p) =>
         `<tr><td>${G.fmtHeure(p.t)}</td><td>${esc(p.c)}</td><td>${p.n == null ? "" : p.n}</td><td>${esc(p.r)}</td></tr>`).join("") + "</table>" : ""); });
+    if (etat.incidents.length) h += "<h2 style=\"margin:16pt 0 0;font-size:12pt\">Incidents</h2><table><tr><th>Date</th><th>Type</th><th>Note</th><th>Position</th></tr>" +
+      etat.incidents.map((i) => `<tr><td>${G.fmtDate(i.t)} ${G.fmtHeure(i.t)}</td><td>${esc(i.type)}</td><td>${esc(i.note)}</td><td>${i.ll ? i.ll.join(", ") : ""}</td></tr>`).join("") + "</table>";
     if (!etat.journal.length) h += "<p>Aucune tournée enregistrée.</p>";
     $("impression").innerHTML = h; window.print();
   }
@@ -464,7 +540,7 @@
         if (risk) { etat.meteo = { t: Date.now(), temp: r.current ? Math.round(r.current.temperature_2m) : null, risk }; sauver(); }
       } catch (e) { /* hors-ligne : on garde la dernière météo connue */ }
     }
-    majMeteo();
+    majMeteo(); appliquerDoseAuto();
   }
   function majMeteo() {
     const m = etat.meteo, puce = $("sMeteo"), carte = $("meteoCarte");
@@ -479,13 +555,18 @@
   // Interface : panneaux, réglages, boutons
   // =====================================================================================
   let panneau = null;
-  const TITRES = { tournee: "Tournée", journal: "Journal de tournée", reglages: "Réglages" };
+  const TITRES = { tournee: "Tournée", sel: "Sel", journal: "Journal de tournée", reglages: "Réglages", incident: "Incident / voie bloquée", checklist: "Check-list de départ" };
   function ouvrirPanneau(nom) {
     if (panneau === nom) { fermerPanneau(); return; }
     panneau = nom; $("feuille").hidden = false; $("feuilleTitre").textContent = TITRES[nom];
     document.querySelectorAll(".panneau").forEach((p) => (p.hidden = p.id !== "p-" + nom));
     document.querySelectorAll("#onglets button").forEach((b) => b.classList.toggle("on", b.dataset.p === nom));
-    if (nom === "tournee") { majListe(); majSegParts(); majMeteo(); } if (nom === "journal") majJournal();
+    if (nom === "tournee") { majListe(); majSegParts(); majMeteo(); }
+    if (nom === "journal") majJournal();
+    if (nom === "sel") majSel();
+    if (nom === "incident") majIncidentUI();
+    if (nom === "checklist") majChecklist();
+    if (nom === "reglages") majZone();
   }
   function fermerPanneau() { panneau = null; $("feuille").hidden = true; document.querySelectorAll("#onglets button").forEach((b) => b.classList.remove("on")); }
 
@@ -504,10 +585,12 @@
     const id = partId(), l = $("liste"), dv = deriveDe(id), info = infoPart(id), frag = document.createDocumentFragment();
     pts[id].forEach((p, i) => {
       const b = document.createElement("button"); b.type = "button";
-      b.className = (i === idxCur() ? "cur " : "") + (i < idxCur() ? "fait" : "");
+      b.className = (i === idxCur() ? "cur " : "") + (i < idxCur() ? "fait " : "") + (bloque(id, i) ? "bloque" : "");
       const d = position ? G.haversine(position, p.ll) : dv.along[i];
       b.innerHTML = `<span class="n" style="background:${info.couleur}">${p.num !== null ? p.num : "•"}</span><span></span><span class="d">${G.fmtDist(d)}</span>`;
-      b.children[1].textContent = p.nom; b.onclick = () => aller(id, i); frag.appendChild(b);
+      b.children[1].textContent = p.nom;
+      b.onclick = () => { if (bloque(id, i)) { if (confirm("Débloquer cette voie ?")) { delete etat.bloques[id + ":" + i]; sauver(); majTout(); } } else aller(id, i); };
+      frag.appendChild(b);
     });
     l.innerHTML = ""; l.appendChild(frag);
     const cur = l.querySelector(".cur"); if (cur && panneau === "tournee") cur.scrollIntoView({ block: "nearest" });
@@ -539,8 +622,210 @@
     if (recadrer) map.fitBounds(L.latLngBounds(t.parts.flatMap((id) => deriveDe(id).line)), { padding: [24, 24] });
   }
 
+  // =====================================================================================
+  // Voies bloquées, incidents (position + heure + note + photo), check-list de départ
+  // =====================================================================================
+  let dbP = null;
+  const idb = (mode, fn) => { // petite base IndexedDB pour les photos (trop lourdes pour le stockage simple)
+    dbP = dbP || new Promise((res, rej) => { const r = indexedDB.open("gps-salage", 1);
+      r.onupgradeneeded = () => r.result.createObjectStore("photos"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+    return dbP.then((db) => new Promise((res, rej) => { const t = db.transaction("photos", mode), q = fn(t.objectStore("photos"));
+      t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }));
+  };
+  async function reduirePhoto(file) { // 900 px max, JPEG : ~60 Ko par photo
+    const bmp = await createImageBitmap(file), k = Math.min(1, 900 / Math.max(bmp.width, bmp.height));
+    const c = document.createElement("canvas"); c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    return new Promise((res) => c.toBlob(res, "image/jpeg", 0.7));
+  }
+  function positionActuelle() {
+    return new Promise((res) => {
+      if (position && Date.now() - lastFixT < 60000) return res(position);
+      if (!navigator.geolocation) return res(position);
+      navigator.geolocation.getCurrentPosition((g) => res([g.coords.latitude, g.coords.longitude]), () => res(position),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 30000 });
+    });
+  }
+  async function enregistrerIncident(type, note, fichier) {
+    const ll = await positionActuelle(), s = sessionCourante(false);
+    const inc = { id: "n" + Date.now(), t: Date.now(), ll: ll ? [+ll[0].toFixed(5), +ll[1].toFixed(5)] : null, type, note: note || "", photo: null, session: s ? s.id : null };
+    if (fichier) { try { const blob = await reduirePhoto(fichier); inc.photo = "p" + inc.t; await idb("readwrite", (st) => st.put(blob, inc.photo)); }
+      catch (e) { inc.photo = null; toast("Photo non enregistrée."); } }
+    etat.incidents.unshift(inc); etat.incidents = etat.incidents.slice(0, 200); sauver(); majJournal();
+    return inc;
+  }
+  const TYPES_INC = ["Véhicule gênant", "Arbre tombé", "Verglas persistant", "Accident", "Autre"];
+  let typeInc = "Autre";
+  function majIncidentUI() {
+    const t = $("iTypes"); t.innerHTML = "";
+    TYPES_INC.forEach((x) => { const b = document.createElement("button"); b.type = "button"; b.textContent = x; b.classList.toggle("on", x === typeInc);
+      b.onclick = () => { typeInc = x; majIncidentUI(); }; t.appendChild(b); });
+    $("iBloque").textContent = `Voie impraticable : sauter « ${cible().nom} »`;
+  }
+  function bloquerPoint() {
+    const id = partId(), i = idxCur(), p = pts[id][i];
+    etat.bloques[id + ":" + i] = 1;
+    enregistrerIncident("Voie bloquée", `${p.num !== null ? "n°" + p.num + " · " : ""}${p.nom}`, null);
+    fermerPanneau(); avancer(1, true); toast("Voie marquée impraticable : point suivant.");
+  }
+  function majChecklist() {
+    const l = $("clListe"); l.innerHTML = "";
+    etat.checklist.forEach((nom, k) => {
+      const ok = !!etat.cl[nom], d = document.createElement("div"); d.className = "coche" + (ok ? " ok" : "");
+      d.innerHTML = '<span class="box"></span><span></span><button type="button" class="x" aria-label="Retirer cet élément">✕</button>';
+      d.children[0].textContent = ok ? "✓" : ""; d.children[1].textContent = nom;
+      d.setAttribute("role", "checkbox"); d.setAttribute("aria-checked", String(ok)); d.tabIndex = 0;
+      d.onclick = () => { etat.cl[nom] = !etat.cl[nom]; sauver(); majChecklist(); };
+      d.onkeydown = (e) => { if (e.key === " " || e.key === "Enter") { e.preventDefault(); d.click(); } };
+      d.children[2].onclick = (e) => { e.stopPropagation(); etat.checklist.splice(k, 1); sauver(); majChecklist(); };
+      l.appendChild(d);
+    });
+  }
+
+  // =====================================================================================
+  // Sel : dose conseillée, consommation par km, stock restant dans le camion
+  // =====================================================================================
+  const numSel = (v, d) => { const x = parseFloat(v); return isFinite(x) ? x : d; };
+  const selUtilise = () => { const s = sessionCourante(false); return s ? G.selDe(s) : 0; };
+  function appliquerDoseAuto() {
+    const c = etat.meteo && etat.meteo.risk ? G.doseSel(etat.meteo.risk) : null;
+    if (c && c.gm2 > 0 && !etat.sel.manuel) { etat.sel.dose = c.gm2; sauver(); }
+    majSelChip();
+  }
+  function majSelChip() {
+    const sel = etat.sel, stock = parseFloat(sel.stock), chip = $("sSel");
+    if (!isFinite(stock)) chip.innerHTML = sel.saleuse ? "saleuse <b>ON</b>" : "";
+    else { const reste = stock - selUtilise(), court = reste < G.kgSel(sel.dose, sel.largeur, resteM / 1000);
+      chip.innerHTML = `sel <b class="${court ? "chip-rouge" : ""}">${Math.max(0, Math.round(reste))} kg</b>${sel.saleuse ? " · ON" : ""}`; }
+    if (panneau === "sel") majSel();
+  }
+  function majSel() {
+    const sel = etat.sel, c = etat.meteo && etat.meteo.risk ? G.doseSel(etat.meteo.risk) : null;
+    $("selConseil").innerHTML = c ? `<b>${c.texte}</b>${c.mode === "aucun" || c.mode === "inconnu" ? "" : " (" + c.mode + ")"}<br>${c.note}<br><span style="color:var(--doux)">Indicatif : suis les consignes de ton service.</span>`
+      : "Météo indisponible : règle la dose à la main.";
+    if (document.activeElement !== $("sDose")) $("sDose").value = sel.dose;
+    if (document.activeElement !== $("sLarg")) $("sLarg").value = sel.largeur;
+    if (document.activeElement !== $("sStock")) $("sStock").value = sel.stock;
+    const b = $("sSaleuse"); b.textContent = sel.saleuse ? "Saleuse ACTIVE : appuie pour couper" : "Saleuse coupée : appuie pour activer"; b.classList.toggle("on", sel.saleuse);
+    const kgKm = sel.dose * sel.largeur, besoin = G.kgSel(sel.dose, sel.largeur, resteM / 1000), stock = parseFloat(sel.stock), u = selUtilise();
+    let h = `Consommation : <b>${Math.round(kgKm)} kg/km</b> (${sel.dose} g/m² × ${sel.largeur} m)<br>Reste de la tournée : <b>${G.fmtDist(resteM)}</b>, soit ≈ <b>${Math.round(besoin)} kg</b> de sel`;
+    if (isFinite(stock)) { const reste = stock - u;
+      h += `<br>Sel déjà utilisé : <b>${Math.round(u)} kg</b><br>Sel restant dans le camion : <b>${Math.max(0, Math.round(reste))} kg</b>` +
+        (kgKm > 0 ? ` (≈ ${G.fmtDist((Math.max(0, reste) / kgKm) * 1000)} de salage)` : "");
+      if (reste < besoin) h += `<br><span class="chip-rouge">⚠ Il manque ≈ ${Math.round(besoin - reste)} kg pour finir la tournée</span>`; }
+    else h += "<br>Renseigne le sel au départ pour suivre le stock restant.";
+    $("selBilan").innerHTML = h;
+  }
+
+  // =====================================================================================
+  // Rejeu d'une tournée sur la carte, bilan à partager
+  // =====================================================================================
+  const rj = { on: false, pts: [], i: 0, virt: 0, last: 0, vit: 30, pause: false, raf: 0, line: null, mk: null, t0: 0, t1: 0 };
+  function fermerRejeu() {
+    rj.on = false; cancelAnimationFrame(rj.raf);
+    if (rj.line) { rj.line.remove(); rj.line = null; } if (rj.mk) { rj.mk.remove(); rj.mk = null; }
+    $("rejeu").hidden = true;
+  }
+  function rejouer() {
+    const j = jours(); if (!j) return;
+    if (!j.pts || j.pts.length < 2) { toast("Pas de trace GPS pour cette tournée (seules les 10 dernières sont gardées)."); return; }
+    fermerRejeu(); fermerPanneau();
+    Object.assign(rj, { pts: j.pts, t0: j.pts[0][2], t1: j.pts[j.pts.length - 1][2], i: 0, pause: false, on: true, last: performance.now() }); rj.virt = rj.t0;
+    rj.line = L.polyline(j.pts.map((p) => [p[0], p[1]]), { color: "#c77dff", weight: 5, opacity: 0.9, interactive: false }).addTo(map);
+    rj.mk = L.circleMarker([j.pts[0][0], j.pts[0][1]], { radius: 9, color: "#fff", weight: 3, fillColor: "#c77dff", fillOpacity: 1, interactive: false }).addTo(map);
+    map.fitBounds(rj.line.getBounds(), { padding: [30, 30] });
+    $("rejeu").hidden = false; $("rjPlay").textContent = "⏸"; rj.raf = requestAnimationFrame(boucleRejeu);
+  }
+  function boucleRejeu(now) {
+    if (!rj.on) return;
+    if (!rj.pause) rj.virt += (now - rj.last) * rj.vit;
+    rj.last = now;
+    if (rj.virt >= rj.t1) { rj.virt = rj.t1; rj.pause = true; $("rjPlay").textContent = "↻"; }
+    const p = rj.pts, n = p.length;
+    while (rj.i < n - 2 && p[rj.i + 1][2] <= rj.virt) rj.i++;
+    const a = p[rj.i], b = p[Math.min(rj.i + 1, n - 1)], span = b[2] - a[2], f = span > 0 ? Math.min(1, Math.max(0, (rj.virt - a[2]) / span)) : 1;
+    rj.mk.setLatLng([a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f]); txt($("rjT"), G.fmtHeure(rj.virt));
+    rj.raf = requestAnimationFrame(boucleRejeu);
+  }
+  const texteBilan = () => { const j = jours(); return j ? G.bilanTexte(j, etat.incidents.filter((i) => i.session === j.id)) : null; };
+
+  // =====================================================================================
+  // Carte hors-ligne : télécharge la zone du circuit (zooms 13 à 16)
+  // =====================================================================================
+  const ZONE = "gps-salage-zone";
+  let zoneEnCours = false, zoneStop = false;
+  function bornesZone() {
+    let s = 90, n = -90, w = 180, e = -180;
+    tourneeCourante().parts.forEach((id) => deriveDe(id).line.forEach((p) => { s = Math.min(s, p[0]); n = Math.max(n, p[0]); w = Math.min(w, p[1]); e = Math.max(e, p[1]); }));
+    return { s: s - 0.007, n: n + 0.007, w: w - 0.011, e: e + 0.011 };
+  }
+  function majZone(prog) {
+    const el = $("zoneCarte"), z = etat.zone, nb = G.tuiles(bornesZone(), 13, 16).length;
+    if (prog) { el.innerHTML = `Téléchargement… <b>${prog.fait} / ${prog.total}</b>${prog.ko ? " · " + prog.ko + " échec(s)" : ""}`; return; }
+    el.innerHTML = (z ? `<b>Zone téléchargée</b> le ${G.fmtDate(z.t)} (${z.n} tuiles${z.ko ? ", " + z.ko + " manquantes" : ""}).<br>` : "<b>Aucune zone téléchargée.</b><br>") +
+      `Circuit + environ 800 m autour, zooms 13 à 16 : ≈ ${nb} tuiles (≈ ${Math.max(1, Math.round(nb * 0.016))} Mo). Plus près (zoom 17 et +), les tuiles sont gardées au fil de ta navigation.`;
+    $("zDl").disabled = !("caches" in window); $("zDl").textContent = zoneEnCours ? "Annuler" : "Télécharger la zone";
+  }
+  async function telechargerZone() {
+    if (zoneEnCours) { zoneStop = true; return; }
+    if (!("caches" in window)) { toast("Hors-ligne indisponible sur ce navigateur."); return; }
+    const liste = G.tuiles(bornesZone(), 13, 16);
+    if (liste.length > 900) { toast("Zone trop grande pour être téléchargée."); return; }
+    zoneEnCours = true; zoneStop = false; let i = 0, ok = 0, ko = 0;
+    try {
+      const cache = await caches.open(ZONE);
+      majZone({ fait: 0, total: liste.length, ko: 0 }); $("zDl").textContent = "Annuler";
+      while (i < liste.length && !zoneStop) { // une tuile à la fois, avec une pause : on ménage le serveur d'OpenStreetMap
+        const [z, x, y] = liste[i++], url = `https://tile.openstreetmap.org/${z}/${x}/${y}.png`;
+        try { if (await cache.match(url)) ok++; else { const r = await fetch(url); if (r.ok) { await cache.put(url, r); ok++; } else ko++; } } catch (e) { ko++; }
+        majZone({ fait: ok + ko, total: liste.length, ko }); await new Promise((r) => setTimeout(r, 150));
+      }
+    } catch (e) { toast("Téléchargement interrompu : " + (e.message || e)); }
+    zoneEnCours = false;
+    if (zoneStop) toast("Téléchargement annulé.");
+    else if (ok) { etat.zone = { t: Date.now(), n: ok, ko }; sauver(); toast(`Carte hors-ligne prête (${ok} tuiles).`); }
+    majZone();
+  }
+
   // ---------- branchements ----------
-  $("bStart").onclick = () => (watch === null ? demarrerGps() : arreterGps());
+  $("bIncident").onclick = () => ouvrirPanneau("incident");
+  $("iSave").onclick = async () => { const f = $("iPhoto").files[0]; $("iSave").disabled = true;
+    await enregistrerIncident(typeInc, $("iNote").value.trim(), f); $("iSave").disabled = false;
+    $("iNote").value = ""; $("iPhoto").value = ""; typeInc = "Autre"; fermerPanneau(); toast("Incident enregistré dans le journal."); };
+  $("iBloque").onclick = bloquerPoint;
+  $("bDebloq").onclick = () => { const n = Object.keys(etat.bloques).length; if (!n) { toast("Aucune voie bloquée."); return; }
+    etat.bloques = {}; sauver(); majTout(); toast(n + " voie(s) débloquée(s)."); };
+  $("clGo").onclick = () => { const manque = etat.checklist.filter((n) => !etat.cl[n]).length;
+    if (manque && !confirm(`${manque} élément(s) non coché(s). Partir quand même ?`)) return;
+    etat.cl = {}; sauver(); fermerPanneau(); demarrerGps(); };
+  $("clPasser").onclick = () => { fermerPanneau(); demarrerGps(); };
+  $("clAjout").onclick = () => { const n = (prompt("Nouvel élément de la check-list :") || "").trim(); if (n) { etat.checklist.push(n); sauver(); majChecklist(); } };
+  $("sDose").oninput = (e) => { etat.sel.dose = Math.max(0, numSel(e.target.value, 0)); etat.sel.manuel = true; sauver(); majSelChip(); };
+  $("sLarg").oninput = (e) => { etat.sel.largeur = Math.max(1, numSel(e.target.value, 6)); sauver(); majSelChip(); };
+  $("sStock").oninput = (e) => { etat.sel.stock = e.target.value; sauver(); majSelChip(); };
+  $("sDoseAuto").onclick = () => { etat.sel.manuel = false; appliquerDoseAuto(); majSel(); };
+  $("sSaleuse").onclick = () => { etat.sel.saleuse = !etat.sel.saleuse; sauver(); majSelChip();
+    toast(etat.sel.saleuse ? "Saleuse activée : le sel est compté selon la distance parcourue." : "Saleuse coupée."); };
+  $("jSuppr").onclick = () => { const j = jours(); if (!j || !confirm("Supprimer cette tournée du journal ?")) return;
+    etat.journal = etat.journal.filter((x) => x.id !== j.id); if (etat.session === j.id) etat.session = null; jChoisie = null; sauver(); majJournal(); };
+  $("jShare").onclick = () => { const t = texteBilan(); if (!t) return;
+    if (navigator.share) navigator.share({ title: "Bilan de tournée de salage", text: t }).catch(() => {});
+    else if (navigator.clipboard) navigator.clipboard.writeText(t).then(() => toast("Bilan copié : colle-le dans un message.")); };
+  $("jSms").onclick = () => { const t = texteBilan(); if (t) location.href = "sms:?&body=" + encodeURIComponent(t); };
+  $("jWa").onclick = () => { const t = texteBilan(); if (t) window.open("https://wa.me/?text=" + encodeURIComponent(t), "_blank"); };
+  $("jRejeu").onclick = rejouer;
+  $("rjPlay").onclick = () => { if (rj.virt >= rj.t1) { rj.virt = rj.t0; rj.i = 0; rj.pause = false; } else rj.pause = !rj.pause; $("rjPlay").textContent = rj.pause ? "▶" : "⏸"; };
+  $("rjVit").onclick = () => { const v = [10, 30, 100, 300]; rj.vit = v[(v.indexOf(rj.vit) + 1) % v.length]; $("rjVit").textContent = "×" + rj.vit; };
+  $("rjFerme").onclick = fermerRejeu;
+  $("zDl").onclick = telechargerZone;
+  $("zSup").onclick = async () => { if (!confirm("Supprimer la carte hors-ligne téléchargée ?")) return;
+    try { await caches.delete(ZONE); } catch (e) { /* rien à supprimer */ } etat.zone = null; sauver(); majZone(); toast("Carte hors-ligne supprimée."); };
+
+  $("bStart").onclick = () => {
+    if (watch !== null) arreterGps();
+    else if (etat.reg.checklist !== false && !sessionCourante(false) && etat.checklist.length) ouvrirPanneau("checklist");
+    else demarrerGps();
+  };
   $("bPrec").onclick = () => avancer(-1);
   $("bSuiv").onclick = () => avancer(1);
   $("bSuivi").onclick = (e) => { suivre = !suivre; e.currentTarget.classList.toggle("on", suivre); e.currentTarget.setAttribute("aria-pressed", suivre);
@@ -569,6 +854,8 @@
   segmenter("segTaille", () => etat.reg.echelle, (v) => { etat.reg.echelle = +v; sauver(); appliquerReglages(); });
   $("rVoix").checked = etat.reg.voix;
   $("rVoix").onchange = (e) => { etat.reg.voix = e.target.checked; sauver(); if (etat.reg.voix) parler("Guidage vocal activé"); };
+  $("rCheck").checked = etat.reg.checklist !== false;
+  $("rCheck").onchange = (e) => { etat.reg.checklist = e.target.checked; sauver(); };
   $("rRayon").value = etat.reg.rayon; txt($("rRayonV"), etat.reg.rayon + " m");
   $("rRayon").oninput = (e) => { etat.reg.rayon = +e.target.value; txt($("rRayonV"), etat.reg.rayon + " m"); sauver(); };
   $("rVitesse").value = etat.reg.vitesse;
@@ -579,7 +866,7 @@
   setInterval(() => { if (etat.reg.theme === "auto") appliquerReglages(); }, 10 * 60e3);
 
   // ---------- démarrage ----------
-  appliquerReglages(); majSelTournee(); chargerTournee(true); majJournal();
+  appliquerReglages(); majSelTournee(); chargerTournee(true); majJournal(); majSelChip();
   const n3 = tourneeCourante().id === "n3";
   if (n3 && !etat.calage) toast("Première utilisation : ouvre Tournée → « Caler le circuit » et touche 3 repères sur la carte.", 15000);
   else if (tourneeCourante().parts.some((id) => !etat.geo[id] && !etat.traces[id])) aligner(true);

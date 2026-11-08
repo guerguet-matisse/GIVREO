@@ -97,7 +97,7 @@
     const w = wpts.map((p) => `  <wpt lat="${p.ll[0].toFixed(6)}" lon="${p.ll[1].toFixed(6)}"><name>${esc(p.name)}</name></wpt>`).join("\n");
     const t = trk.length ? `  <trk><name>${esc(name)}</name><trkseg>\n${trk.map((p) =>
       `    <trkpt lat="${p[0].toFixed(6)}" lon="${p[1].toFixed(6)}"/>`).join("\n")}\n  </trkseg></trk>\n` : "";
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="GPS Salage" xmlns="http://www.topografix.com/GPX/1/1">\n` +
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Givréo" xmlns="http://www.topografix.com/GPX/1/1">\n` +
       `  <metadata><name>${esc(name)}</name></metadata>\n${w}\n${t}</gpx>\n`;
   }
 
@@ -150,7 +150,62 @@
   const fmtHeure = (d) => new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
   const fmtDate = (d) => new Date(d).toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
+  // ---------- dosage de sel conseillé (indicatif : à adapter aux consignes du service) ----------
+  // g/m² : préventif ≈ 10, curatif ≈ 20, davantage par grand froid ; le sel perd en efficacité sous -10 °C
+  function doseSel(risk) {
+    if (!risk) return { gm2: 0, mode: "inconnu", texte: "Météo indisponible", note: "" };
+    if (risk.niveau === "faible") return { gm2: 0, mode: "aucun", texte: "Pas de salage nécessaire", note: "Aucun gel prévu dans les 12 h." };
+    const froid = Math.min(risk.minT, risk.minSol), eleve = risk.niveau === "eleve";
+    let g = eleve ? 20 : 10;
+    if (froid <= -5) g += 10;
+    if (froid <= -10) g += 10;
+    const note = froid <= -10 ? "Sous -10 °C le sel est peu efficace : voir avec ton responsable (sel humidifié, abrasifs)."
+      : eleve ? "Gel et précipitations prévus : traitement curatif." : "Gel possible : traitement préventif.";
+    return { gm2: g, mode: eleve ? "curatif" : "préventif", texte: g + " g/m² conseillés", note };
+  }
+  // 1 g/m² sur 1 km de largeur 1 m = 1 kg  ->  kg = g/m² × largeur(m) × km
+  const kgSel = (gm2, largeur, km) => gm2 * largeur * km;
+
+  // ---------- bilan de tournée (texte à envoyer) ----------
+  function selDe(s) { const v = parseFloat(s.selKg); return isFinite(v) ? v : (s.selAuto || 0); }
+  function bilanTexte(s, incs) {
+    const v = parseFloat(s.selKg);
+    const sel = isFinite(v) ? v + " kg" : s.selAuto ? "≈ " + Math.round(s.selAuto) + " kg (estimé)" : "non renseigné";
+    const T = [`Tournée de salage – ${s.tournee}`,
+      `${fmtDate(s.debut)} · ${fmtHeure(s.debut)}${s.fin ? "–" + fmtHeure(s.fin) + " (" + fmtDuree((s.fin - s.debut) / 1000) + ")" : " (en cours)"}`,
+      `${s.km.toFixed(1).replace(".", ",")} km · ${s.passages.length} points passés`, `Sel : ${sel}`];
+    if (s.meteo) T.push("Météo : " + s.meteo);
+    if (incs && incs.length) { T.push(`Incidents (${incs.length}) :`); incs.forEach((i) => T.push(`- ${fmtHeure(i.t)} ${i.type}${i.note ? " : " + i.note : ""}`)); }
+    if (s.notes) T.push("Notes : " + s.notes);
+    return T.join("\n");
+  }
+
+  // ---------- statistiques (journal trié de la plus récente à la plus ancienne) ----------
+  function statistiques(journal) {
+    const fin = journal.filter((j) => j.fin), moy = (a) => a.reduce((x, y) => x + y, 0) / a.length, duree = (j) => (j.fin - j.debut) / 1000;
+    const by = {}; fin.forEach((j) => (by[j.tournee] = by[j.tournee] || []).push(j));
+    const parCircuit = Object.keys(by).map((titre) => { const arr = by[titre], prev = arr.slice(1);
+      return { titre, n: arr.length, dureeMoy: moy(arr.map(duree)), kmMoy: moy(arr.map((j) => j.km)), selMoy: moy(arr.map(selDe)),
+        derniere: { duree: duree(arr[0]), km: arr[0].km, ecart: prev.length ? duree(arr[0]) - moy(prev.map(duree)) : null } }; });
+    const mois = {};
+    fin.forEach((j) => { const d = new Date(j.debut), k = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+      const m = (mois[k] = mois[k] || { mois: k, sel: 0, km: 0, n: 0 }); m.sel += selDe(j); m.km += j.km; m.n++; });
+    return { parCircuit, parMois: Object.keys(mois).sort().map((k) => mois[k]) };
+  }
+
+  // ---------- tuiles de carte à télécharger pour le hors-ligne ----------
+  function tuiles(b, zmin, zmax) { // b = {s, w, n, e}
+    const out = [];
+    for (let z = zmin; z <= zmax; z++) {
+      const N = 2 ** z, X = (lon) => Math.floor(((lon + 180) / 360) * N),
+        Y = (lat) => Math.floor(((1 - Math.log(Math.tan(lat * rad) + 1 / Math.cos(lat * rad)) / Math.PI) / 2) * N);
+      const x0 = X(b.w), x1 = X(b.e), y0 = Y(b.n), y1 = Y(b.s);
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) out.push([z, x, y]);
+    }
+    return out;
+  }
+
   const api = { haversine, bearing, cumulative, nearestForward, alongOf, snapMonotone, simplify, toGPX, parseGPX,
-    toCSV, iceRisk, fmtDist, fmtDuree, fmtHeure, fmtDate };
+    toCSV, iceRisk, fmtDist, fmtDuree, fmtHeure, fmtDate, doseSel, kgSel, selDe, bilanTexte, statistiques, tuiles };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.Lib = api;
 })(typeof self !== "undefined" ? self : this);
