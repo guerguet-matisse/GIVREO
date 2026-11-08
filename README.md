@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🧂 GPS Salage
+# 🧂 GIVRÉO
 
 **Le guidage GPS du circuit de salage – Itinéraire (Soissons)**
 
@@ -168,12 +168,9 @@ gps-salage/
 
 Performance : rendu des tracés en canvas, marqueurs mis à jour uniquement quand ils changent, logique GPS limitée à ~2 calculs par seconde, traces simplifiées (Douglas-Peucker), sauvegardes différées, chargement instantané grâce au cache.
 
-Tester en local : `python -m http.server 8000`, puis <http://localhost:8000>.
-Déploiement : GitHub Pages, branche `main`, dossier `/ (root)`.
-
 ---
 
-## 📜 Licence
+## 📜 Licence GIVRÉO
 
 © 2026 Matisse Guerguet – **Tous droits réservés.**
 Le code, les données d'itinéraires et l'interface sont la propriété exclusive de l'auteur : toute copie, modification, redistribution ou réutilisation sans autorisation écrite est interdite. L'utilisation de l'application en ligne reste libre.
